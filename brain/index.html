@@ -1,0 +1,2305 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GeM Tender Brain — Product Requirements Document</title>
+<meta name="description" content="Product requirements, architecture, scoring model, setup and operations for GeM Tender Brain — a Python tender-scanning workspace.">
+<meta name="color-scheme" content="light dark">
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem("gem-prd-theme");
+      var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-theme", saved || (prefersDark ? "dark" : "light"));
+    } catch (e) {}
+  })();
+</script>
+<style>
+  /* ---------------------------------------------------------------- tokens */
+  :root {
+    --bg: #f4f5fa;
+    --surface: #ffffff;
+    --surface-2: #fafbfe;
+    --surface-3: #f2f4fa;
+    --ink: #0d1526;
+    --ink-2: #2f3b55;
+    --muted: #67718b;
+    --line: #e2e6f0;
+    --line-2: #eef1f8;
+    --brand: #4f46e5;
+    --brand-2: #6366f1;
+    --brand-soft: #eef0ff;
+    --teal: #0f9488;
+    --teal-soft: #e6f7f4;
+    --green: #157f4a;
+    --green-soft: #e7f7ee;
+    --amber: #a9600a;
+    --amber-soft: #fdf3e3;
+    --red: #b42318;
+    --red-soft: #fdeceb;
+    --blue: #175cd3;
+    --blue-soft: #eaf2ff;
+    --hero: #0a0f1f;
+    --shadow-sm: 0 1px 2px rgba(13, 21, 38, .05);
+    --shadow: 0 1px 2px rgba(13, 21, 38, .04), 0 18px 40px -24px rgba(13, 21, 38, .35);
+    --radius: 16px;
+    --radius-sm: 11px;
+    --sidebar: 268px;
+    --topbar: 66px;
+    --mono: "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif;
+  }
+
+  html[data-theme="dark"] {
+    --bg: #070b14;
+    --surface: #0e1424;
+    --surface-2: #101a2d;
+    --surface-3: #141f36;
+    --ink: #e9edf8;
+    --ink-2: #c2cbe0;
+    --muted: #8f9bb6;
+    --line: #1d2942;
+    --line-2: #162036;
+    --brand: #8b8cf8;
+    --brand-2: #a5a6ff;
+    --brand-soft: #191b3a;
+    --teal: #2dd4bf;
+    --teal-soft: #0c2b2c;
+    --green: #4ade80;
+    --green-soft: #0d2a1c;
+    --amber: #fbbf24;
+    --amber-soft: #2c2210;
+    --red: #f87171;
+    --red-soft: #2e1517;
+    --blue: #7cb2ff;
+    --blue-soft: #12233f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 24px 50px -30px rgba(0, 0, 0, .8);
+  }
+
+  /* ---------------------------------------------------------------- base */
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 520px at 88% -8%, rgba(79, 70, 229, .10), transparent 62%),
+      radial-gradient(760px 460px at -8% 6%, rgba(15, 148, 136, .08), transparent 58%),
+      var(--bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--brand); text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  img, svg { max-width: 100%; }
+  button { font: inherit; }
+  ::selection { background: rgba(99, 102, 241, .22); }
+  :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 6px; }
+
+  .skip-link {
+    position: absolute; left: 16px; top: -60px; z-index: 200;
+    background: var(--brand); color: #fff; padding: 10px 16px; border-radius: 10px;
+    transition: top .18s ease;
+  }
+  .skip-link:focus { top: 12px; text-decoration: none; }
+
+  /* ---------------------------------------------------------------- topbar */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    height: var(--topbar);
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 28px;
+    background: color-mix(in srgb, var(--bg) 78%, transparent);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(14px) saturate(1.4);
+  }
+  .brand { display: flex; align-items: center; gap: 11px; color: var(--ink); font-weight: 650; letter-spacing: -.01em; }
+  .brand:hover { text-decoration: none; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    color: #fff; font-size: 12px; font-weight: 800; letter-spacing: .04em;
+    background: linear-gradient(140deg, #6366f1, #4338ca 55%, #0f9488);
+    box-shadow: 0 6px 16px -8px rgba(79, 70, 229, .9);
+  }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+  .brand-text b { font-size: .95rem; }
+  .brand-text span { font-size: .69rem; color: var(--muted); font-weight: 500; letter-spacing: .06em; text-transform: uppercase; }
+  .topbar-spacer { flex: 1 1 auto; }
+  .topbar-meta { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .78rem; }
+  .topbar-meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    height: 36px; min-width: 36px; padding: 0 11px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); color: var(--ink-2);
+    font-size: .8rem; font-weight: 600; cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, transform .15s ease;
+  }
+  .icon-btn:hover { border-color: var(--brand); color: var(--brand); transform: translateY(-1px); }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .menu-btn { display: none; }
+
+  .read-progress {
+    position: fixed; top: 0; left: 0; z-index: 60;
+    height: 3px; width: 0%;
+    background: linear-gradient(90deg, var(--brand), var(--teal));
+    box-shadow: 0 0 12px rgba(99, 102, 241, .55);
+    transition: width .1s linear;
+  }
+
+  /* ---------------------------------------------------------------- shell */
+  .shell {
+    display: grid;
+    grid-template-columns: var(--sidebar) minmax(0, 1fr);
+    gap: 44px;
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 0 30px 40px;
+  }
+  .sidebar {
+    position: sticky; top: var(--topbar);
+    align-self: start;
+    height: calc(100vh - var(--topbar));
+    overflow-y: auto;
+    padding: 26px 6px 40px 0;
+    scrollbar-width: thin;
+  }
+  .sidebar::-webkit-scrollbar { width: 8px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+  .toc-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); padding: 0 10px 10px;
+  }
+  .toc-search {
+    width: 100%; margin: 0 0 18px;
+    padding: 9px 12px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); color: var(--ink);
+    font-size: .8rem;
+  }
+  .toc-search::placeholder { color: var(--muted); }
+  .toc-group { margin-bottom: 20px; }
+  .toc-label {
+    font-size: .64rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); padding: 0 10px 6px;
+  }
+  .toc-link {
+    display: flex; align-items: baseline; gap: 9px;
+    padding: 6px 10px; margin: 1px 0;
+    border-radius: 8px; border-left: 2px solid transparent;
+    color: var(--ink-2); font-size: .82rem; line-height: 1.35;
+  }
+  .toc-link:hover { background: var(--surface-3); text-decoration: none; color: var(--ink); }
+  .toc-link .n { font-family: var(--mono); font-size: .66rem; color: var(--muted); min-width: 18px; }
+  .toc-link.active {
+    background: var(--brand-soft); color: var(--brand);
+    border-left-color: var(--brand); font-weight: 600;
+  }
+  .toc-link.active .n { color: var(--brand); }
+  .toc-link.hidden { display: none; }
+  .toc-empty { display: none; padding: 8px 10px; font-size: .76rem; color: var(--muted); }
+
+  main { min-width: 0; max-width: 980px; padding-bottom: 30px; }
+  .section { scroll-margin-top: calc(var(--topbar) + 22px); margin-top: 62px; }
+  .section-head { margin-bottom: 22px; }
+  .kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: .68rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--brand); margin-bottom: 8px;
+  }
+  .kicker .num {
+    font-family: var(--mono); font-size: .64rem;
+    padding: 2px 7px; border-radius: 999px;
+    background: var(--brand-soft); border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+  }
+  h2 { font-size: clamp(1.5rem, 2.6vw, 1.95rem); line-height: 1.18; letter-spacing: -.025em; margin: 0 0 8px; font-weight: 700; }
+  h3 { font-size: 1.06rem; line-height: 1.35; letter-spacing: -.01em; margin: 0 0 6px; font-weight: 650; }
+  h4 { font-size: .86rem; letter-spacing: .02em; margin: 0 0 6px; font-weight: 650; }
+  .section-head p { margin: 0; color: var(--muted); font-size: .95rem; max-width: 72ch; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 1.02rem; color: var(--ink-2); max-width: 74ch; }
+  .muted { color: var(--muted); }
+  .small { font-size: .82rem; }
+  .mono { font-family: var(--mono); font-size: .84em; }
+  code.inline {
+    font-family: var(--mono); font-size: .82em;
+    background: var(--surface-3); border: 1px solid var(--line-2);
+    padding: 1px 5px; border-radius: 5px; color: var(--ink-2);
+  }
+  /* ---------------------------------------------------------------- hero */
+  .hero {
+    position: relative; overflow: hidden;
+    margin-top: 26px; padding: 50px 46px 44px;
+    border-radius: 26px;
+    color: #e9eeff;
+    border: 1px solid rgba(255, 255, 255, .09);
+    background:
+      radial-gradient(680px 320px at 92% -12%, rgba(99, 102, 241, .55), transparent 62%),
+      radial-gradient(520px 300px at 4% 112%, rgba(13, 148, 136, .42), transparent 62%),
+      linear-gradient(155deg, #0a0f20 0%, #111a35 54%, #0a1226 100%);
+    box-shadow: 0 34px 80px -38px rgba(8, 12, 32, .7);
+  }
+  .hero::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, .055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, .055) 1px, transparent 1px);
+    background-size: 46px 46px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 72% 0%, #000 10%, transparent 76%);
+    mask-image: radial-gradient(ellipse 80% 70% at 72% 0%, #000 10%, transparent 76%);
+  }
+  .hero-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr); gap: 40px; align-items: center; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    font-size: .66rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+    color: #b9c6ff; padding: 5px 11px; border-radius: 999px;
+    background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12);
+  }
+  .hero .eyebrow .pulse { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 4px rgba(74, 222, 128, .16); }
+  .hero h1 {
+    margin: 16px 0 14px; font-size: clamp(2.3rem, 4.8vw, 3.45rem);
+    line-height: 1.04; letter-spacing: -.04em; font-weight: 750;
+    text-wrap: balance;
+    background: linear-gradient(96deg, #ffffff 8%, #d9e0ff 52%, #99f6e4 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .hero .lede { color: #b9c4dd; font-size: 1rem; max-width: 54ch; margin-bottom: 22px; }
+  .hero .lede strong { color: #eef2ff; font-weight: 600; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 17px; border-radius: 11px;
+    font-size: .85rem; font-weight: 600; border: 1px solid transparent;
+    cursor: pointer; transition: transform .15s ease, box-shadow .15s ease, background .15s ease;
+  }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); color: #fff; box-shadow: 0 12px 26px -14px rgba(99, 102, 241, .95); }
+  .btn-ghost { background: rgba(255, 255, 255, .06); color: #dbe3ff; border-color: rgba(255, 255, 255, .16); }
+  .btn-ghost:hover { background: rgba(255, 255, 255, .11); }
+  .btn svg { width: 15px; height: 15px; }
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 7px 16px; font-size: .74rem; color: #94a3c4; }
+  .hero-meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .hero-meta b { color: #dbe3f8; font-weight: 600; }
+
+  .hero-panel {
+    position: relative; border-radius: 18px; padding: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .085), rgba(255, 255, 255, .035));
+    border: 1px solid rgba(255, 255, 255, .13);
+    box-shadow: 0 26px 60px -30px rgba(0, 0, 0, .8);
+    backdrop-filter: blur(8px);
+  }
+  .hp-head { display: flex; align-items: center; justify-content: space-between; font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: #9fb0d6; padding: 2px 4px 12px; }
+  .hp-head .live { display: inline-flex; align-items: center; gap: 6px; color: #86efac; }
+  .hp-head .live i { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, .16); }
+  .hp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border-radius: 11px; overflow: hidden; background: rgba(255, 255, 255, .09); margin-bottom: 12px; }
+  .hp-stats div { background: rgba(10, 16, 34, .55); padding: 10px 11px; }
+  .hp-stats b { display: block; font-size: 1.15rem; letter-spacing: -.02em; color: #f2f5ff; font-weight: 700; }
+  .hp-stats span { font-size: .62rem; color: #93a2c4; letter-spacing: .03em; }
+  .hp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .hp-list li { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 9px; background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .06); }
+  .hp-score { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-family: var(--mono); font-size: .7rem; font-weight: 700; color: #c7d2fe; background: rgba(99, 102, 241, .22); border: 1px solid rgba(129, 140, 248, .35); }
+  .hp-list strong { display: block; font-size: .72rem; font-weight: 600; color: #e6ecff; line-height: 1.3; }
+  .hp-list small { display: block; font-size: .62rem; color: #8fa0c4; }
+  .hp-foot { display: flex; justify-content: space-between; font-size: .6rem; color: #8293b6; padding: 11px 4px 1px; }
+
+  /* ---------------------------------------------------------------- layout bits */
+  .grid { display: grid; gap: 14px; }
+  .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px;
+    box-shadow: var(--shadow-sm);
+    transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+  }
+  .card:hover { border-color: color-mix(in srgb, var(--brand) 34%, var(--line)); box-shadow: var(--shadow); }
+  .card p:last-child { margin-bottom: 0; }
+  .card .icon {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--brand-soft); color: var(--brand); margin-bottom: 12px;
+  }
+  .card .icon svg { width: 19px; height: 19px; }
+  .card.teal .icon { background: var(--teal-soft); color: var(--teal); }
+  .card.green .icon { background: var(--green-soft); color: var(--green); }
+  .card.amber .icon { background: var(--amber-soft); color: var(--amber); }
+  .card p { color: var(--muted); font-size: .88rem; }
+  .card h3 { margin-bottom: 4px; }
+
+  .stat { padding: 17px 18px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+  .stat b { display: block; font-size: 1.55rem; letter-spacing: -.03em; line-height: 1.1; font-weight: 720; }
+  .stat span { font-size: .73rem; color: var(--muted); }
+  .stat .sub { display: block; margin-top: 4px; font-size: .68rem; color: var(--brand); }
+
+  .tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: .68rem; font-weight: 650; letter-spacing: .02em;
+    padding: 3px 8px; border-radius: 999px;
+    background: var(--surface-3); color: var(--ink-2); border: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .tag.green { background: var(--green-soft); color: var(--green); border-color: color-mix(in srgb, var(--green) 24%, transparent); }
+  .tag.amber { background: var(--amber-soft); color: var(--amber); border-color: color-mix(in srgb, var(--amber) 24%, transparent); }
+  .tag.red { background: var(--red-soft); color: var(--red); border-color: color-mix(in srgb, var(--red) 24%, transparent); }
+  .tag.blue { background: var(--blue-soft); color: var(--blue); border-color: color-mix(in srgb, var(--blue) 24%, transparent); }
+  .tag.brand { background: var(--brand-soft); color: var(--brand); border-color: color-mix(in srgb, var(--brand) 24%, transparent); }
+  .tag.teal { background: var(--teal-soft); color: var(--teal); border-color: color-mix(in srgb, var(--teal) 24%, transparent); }
+
+  .callout {
+    display: flex; gap: 13px; align-items: flex-start;
+    padding: 15px 17px; margin: 16px 0;
+    border-radius: 12px; border: 1px solid var(--line);
+    border-left: 3px solid var(--brand);
+    background: var(--surface-2);
+    font-size: .87rem; color: var(--ink-2);
+  }
+  .callout .ci { flex: 0 0 auto; margin-top: 2px; color: var(--brand); }
+  .callout .ci svg { width: 18px; height: 18px; }
+  .callout p { margin: 0; }
+  .callout strong { color: var(--ink); }
+  .callout.warn { border-left-color: var(--amber); background: color-mix(in srgb, var(--amber-soft) 55%, var(--surface)); }
+  .callout.warn .ci { color: var(--amber); }
+  .callout.ok { border-left-color: var(--green); background: color-mix(in srgb, var(--green-soft) 55%, var(--surface)); }
+  .callout.ok .ci { color: var(--green); }
+  .callout.danger { border-left-color: var(--red); background: color-mix(in srgb, var(--red-soft) 50%, var(--surface)); }
+  .callout.danger .ci { color: var(--red); }
+
+  .list { list-style: none; padding: 0; margin: 0; display: grid; gap: 9px; }
+  .list li { position: relative; padding-left: 24px; font-size: .89rem; color: var(--ink-2); }
+  .list li::before {
+    content: ""; position: absolute; left: 2px; top: .52em;
+    width: 7px; height: 7px; border-radius: 2px;
+    background: var(--brand); transform: rotate(45deg);
+  }
+  .list.check li::before {
+    content: "✓"; width: auto; height: auto; background: none; transform: none;
+    left: 1px; top: 0; color: var(--green); font-weight: 800; font-size: .82rem;
+  }
+  .list.cross li::before {
+    content: "✕"; width: auto; height: auto; background: none; transform: none;
+    left: 2px; top: 0; color: var(--red); font-weight: 800; font-size: .76rem;
+  }
+  .list.tight { gap: 6px; }
+  .list li b { color: var(--ink); font-weight: 600; }
+
+  /* ---------------------------------------------------------------- tables */
+  .table-wrap { border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: var(--surface); margin: 14px 0; }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .83rem; }
+  th {
+    text-align: left; font-size: .64rem; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+    background: var(--surface-3); padding: 10px 14px; white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+  }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line-2); color: var(--ink-2); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--surface-2); }
+  td strong { color: var(--ink); font-weight: 620; }
+  td .mono, th .mono { font-family: var(--mono); font-size: .78rem; }
+  .num-col { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .table-note { font-size: .74rem; color: var(--muted); margin: -6px 0 14px; }
+
+  /* ---------------------------------------------------------------- code */
+  .code {
+    position: relative; margin: 14px 0;
+    border-radius: 13px; overflow: hidden;
+    border: 1px solid #1c2740; background: #0b1222;
+    box-shadow: 0 14px 34px -24px rgba(0, 0, 0, .8);
+  }
+  .code-head {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 12px; background: #0f1830;
+    border-bottom: 1px solid #1c2740;
+    font-family: var(--mono); font-size: .68rem; color: #8296bd;
+  }
+  .code-head .dots { display: flex; gap: 5px; margin-right: 3px; }
+  .code-head .dots i { width: 8px; height: 8px; border-radius: 50%; background: #2a3a5c; }
+  .code-head .dots i:first-child { background: #f87171; }
+  .code-head .dots i:nth-child(2) { background: #fbbf24; }
+  .code-head .dots i:nth-child(3) { background: #34d399; }
+  .code-head .path { flex: 1 1 auto; }
+  .copy-btn {
+    border: 1px solid #24324f; background: #16213a; color: #a9b8d8;
+    font-size: .64rem; padding: 3px 9px; border-radius: 6px; cursor: pointer;
+    font-family: var(--sans); letter-spacing: .02em;
+  }
+  .copy-btn:hover { color: #fff; border-color: #3b4f78; }
+  .code pre { margin: 0; padding: 14px 16px; overflow-x: auto; }
+  .code code { font-family: var(--mono); font-size: .78rem; line-height: 1.7; color: #d6e0f7; white-space: pre; }
+  .code .c { color: #64789c; }
+  .code .k { color: #c4b5fd; }
+  .code .s { color: #86efac; }
+  .code .n { color: #fcd34d; }
+
+  /* ---------------------------------------------------------------- pipeline */
+  .pipe { position: relative; display: grid; gap: 12px; margin-top: 18px; }
+  .pipe::before {
+    content: ""; position: absolute; left: 19px; top: 18px; bottom: 18px;
+    width: 2px; background: linear-gradient(180deg, var(--brand), var(--teal));
+    opacity: .25;
+  }
+  .pipe-item { position: relative; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .pipe-num {
+    position: relative; z-index: 1; width: 40px; height: 40px; border-radius: 12px;
+    display: grid; place-items: center; font-family: var(--mono); font-size: .76rem; font-weight: 700;
+    color: var(--brand); background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line));
+    box-shadow: 0 0 0 4px var(--bg);
+  }
+  .pipe-body { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 14px 16px; }
+  .pipe-body .pt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .pipe-body h4 { margin: 0; font-size: .9rem; }
+  .pipe-body p { margin: 0; color: var(--muted); font-size: .84rem; }
+  .pipe-body .file { font-family: var(--mono); font-size: .66rem; color: var(--teal); }
+
+  /* ---------------------------------------------------------------- architecture */
+  .arch { margin: 18px 0 8px; display: grid; gap: 0; }
+  .arch-layer { border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 14px; }
+  .arch-layer.hot { border-color: color-mix(in srgb, var(--brand) 32%, var(--line)); background: linear-gradient(180deg, color-mix(in srgb, var(--brand-soft) 45%, var(--surface)), var(--surface)); }
+  .arch-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .63rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 9px; }
+  .arch-label span:last-child { font-family: var(--mono); font-size: .6rem; letter-spacing: 0; text-transform: none; }
+  .arch-nodes { display: flex; flex-wrap: wrap; gap: 7px; }
+  .arch-node {
+    flex: 1 1 auto; min-width: 120px;
+    padding: 8px 11px; border-radius: 9px;
+    background: var(--surface-2); border: 1px solid var(--line);
+    font-size: .75rem; font-weight: 600; color: var(--ink-2);
+    text-align: center;
+  }
+  .arch-node small { display: block; font-size: .63rem; font-weight: 500; color: var(--muted); }
+  .arch-node.core { background: var(--brand-soft); border-color: color-mix(in srgb, var(--brand) 24%, transparent); color: var(--brand); }
+  .arch-link { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 0; color: var(--muted); font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; }
+  .arch-link::before { content: ""; width: 2px; height: 12px; background: var(--line); }
+  .arch-link::after { content: "↓"; font-size: .8rem; color: var(--brand); line-height: .7; }
+  .arch-link em { font-style: normal; font-family: var(--mono); font-size: .6rem; letter-spacing: 0; text-transform: none; }
+
+  /* ---------------------------------------------------------------- score bars */
+  .score-card { padding: 22px; }
+  .score-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
+  .score-total { display: flex; align-items: baseline; gap: 6px; }
+  .score-total b { font-size: 2.5rem; line-height: 1; letter-spacing: -.045em; font-weight: 750; color: var(--brand); }
+  .score-total span { font-size: .8rem; color: var(--muted); }
+  .score-bars { display: grid; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: minmax(140px, 1.1fr) minmax(0, 2.4fr) 42px; gap: 10px; align-items: center; font-size: .76rem; }
+  .bar-row .lbl { color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-row .val { text-align: right; font-family: var(--mono); font-size: .7rem; color: var(--muted); }
+  .bar-track { height: 7px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #6366f1, #0f9488); }
+  .bar-fill.neg { background: linear-gradient(90deg, #f87171, #b42318); }
+  .score-foot { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); font-size: .73rem; color: var(--muted); }
+
+  /* ---------------------------------------------------------------- timeline */
+  .timeline { display: grid; gap: 0; margin-top: 16px; }
+  .tl-item { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 18px; padding-bottom: 20px; position: relative; }
+  .tl-item:last-child { padding-bottom: 0; }
+  .tl-item::before { content: ""; position: absolute; left: 105px; top: 22px; bottom: 0; width: 1px; background: var(--line); }
+  .tl-item:last-child::before { display: none; }
+  .tl-when { text-align: right; font-family: var(--mono); font-size: .68rem; color: var(--muted); padding-top: 3px; }
+  .tl-body { position: relative; padding-left: 18px; }
+  .tl-body::before { content: ""; position: absolute; left: -5px; top: 7px; width: 9px; height: 9px; border-radius: 50%; background: var(--surface); border: 2px solid var(--brand); }
+  .tl-item.done .tl-body::before { background: var(--brand); }
+  .tl-body h4 { margin-bottom: 3px; }
+  .tl-body p { margin: 0; font-size: .83rem; color: var(--muted); }
+
+  /* ---------------------------------------------------------------- faq */
+  details.faq {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+    padding: 0; margin-bottom: 9px; overflow: hidden;
+  }
+  details.faq summary {
+    cursor: pointer; padding: 13px 16px; font-size: .88rem; font-weight: 600;
+    list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::after { content: "+"; font-size: 1.1rem; color: var(--muted); font-weight: 400; }
+  details.faq[open] summary::after { content: "−"; }
+  details.faq[open] summary { border-bottom: 1px solid var(--line-2); }
+  details.faq .faq-body { padding: 12px 16px 15px; font-size: .85rem; color: var(--muted); }
+  details.faq .faq-body p:last-child { margin-bottom: 0; }
+
+  /* ---------------------------------------------------------------- misc */
+  .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .panel { border: 1px solid var(--line); border-radius: 14px; padding: 18px; background: var(--surface); }
+  .panel.ok { border-top: 3px solid var(--green); }
+  .panel.no { border-top: 3px solid var(--red); }
+  .panel h3 { font-size: .93rem; }
+  .kv { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(0, 1.2fr); gap: 0; font-size: .82rem; }
+  .kv dt { color: var(--muted); padding: 8px 0; border-bottom: 1px solid var(--line-2); }
+  .kv dd { margin: 0; padding: 8px 0; border-bottom: 1px solid var(--line-2); color: var(--ink-2); }
+  .kv dt:last-of-type, .kv dd:last-of-type { border-bottom: 0; }
+  .section-intro { font-size: .9rem; color: var(--muted); margin-bottom: 16px; }
+  .divider { height: 1px; background: var(--line); margin: 34px 0; border: 0; }
+  .anchor-link { color: var(--muted); font-size: .78rem; margin-left: 6px; opacity: 0; transition: opacity .15s ease; }
+  h2:hover .anchor-link { opacity: 1; }
+
+  /* ---------------------------------------------------------------- footer */
+  .site-footer { border-top: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 60%, transparent); }
+  .footer-inner {
+    max-width: 1320px; margin: 0 auto; padding: 24px 30px;
+    display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between;
+    font-size: .8rem; color: var(--muted);
+  }
+  .footer-links { display: flex; flex-wrap: wrap; gap: 16px; }
+  .footer-links a { color: var(--muted); font-size: .78rem; }
+  .footer-links a:hover { color: var(--brand); }
+  .to-top {
+    position: fixed; right: 22px; bottom: 22px; z-index: 40;
+    width: 40px; height: 40px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+    font-size: 1rem; cursor: pointer; box-shadow: var(--shadow);
+    opacity: 0; pointer-events: none; transform: translateY(8px);
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  .to-top.show { opacity: 1; pointer-events: auto; transform: none; }
+  .scrim { position: fixed; inset: 0; background: rgba(4, 8, 18, .55); z-index: 55; backdrop-filter: blur(2px); }
+
+  html[data-theme="dark"] .i-sun { display: none; }
+  html[data-theme="dark"] .i-moon { display: block !important; }
+
+  /* ---------------------------------------------------------------- responsive */
+  @media (max-width: 1280px) {
+    .to-top { display: none; }
+  }
+  @media (max-width: 1120px) {
+    .shell { grid-template-columns: minmax(0, 1fr); padding: 0 22px 32px; }
+    .sidebar {
+      position: fixed; left: 0; top: 0; z-index: 58;
+      width: min(310px, 86vw); height: 100dvh; padding: 22px 16px 40px;
+      background: var(--surface); border-right: 1px solid var(--line);
+      transform: translateX(-104%); transition: transform .22s ease;
+      box-shadow: 24px 0 60px -30px rgba(0, 0, 0, .5);
+    }
+    .sidebar.open { transform: none; }
+    .menu-btn { display: inline-flex; }
+    main { max-width: 100%; }
+    .hero-panel { max-width: 460px; }
+  }
+  @media (min-width: 1121px) and (max-width: 1259px) {
+    .hero-grid { grid-template-columns: minmax(0, 1fr); }
+    .hero-panel { max-width: 560px; }
+  }
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: minmax(0, 1fr); }
+    .hero-panel { max-width: 560px; }
+  }
+  @media (max-width: 760px) {
+    body { font-size: 15px; }
+    .topbar { padding: 0 14px; gap: 10px; }
+    .topbar-meta { display: none; }
+    .hide-sm { display: none; }
+    .shell { padding: 0 14px 26px; }
+    .hero { padding: 34px 22px 30px; border-radius: 20px; margin-top: 16px; }
+    .hero .lede { font-size: .94rem; }
+    .grid-2, .grid-3, .grid-4, .split { grid-template-columns: minmax(0, 1fr); }
+    .section { margin-top: 46px; }
+    .bar-row { grid-template-columns: minmax(100px, 1.2fr) minmax(0, 1.8fr) 36px; gap: 7px; }
+    .footer-inner { padding: 20px 16px; }
+    .tl-item { grid-template-columns: 70px minmax(0, 1fr); gap: 12px; }
+    .tl-item::before { left: 82px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --ink: #000; --muted: #444; --line: #ccc; }
+    body { background: #fff; font-size: 10.5pt; }
+    .topbar, .sidebar, .to-top, .scrim, .read-progress, .hero-actions, .copy-btn, .site-footer { display: none !important; }
+    .shell { display: block; max-width: none; padding: 0; }
+    main { max-width: none; }
+    .hero { color: #fff; box-shadow: none; padding: 26px; border-radius: 0; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .card, .panel, .table-wrap, .code, .pipe-body, .arch-layer, details.faq { break-inside: avoid; }
+    .section { margin-top: 26px; }
+    a { color: #000; }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#overview">Skip to content</a>
+<div class="read-progress" id="readProgress" aria-hidden="true"></div>
+
+<header class="topbar">
+  <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open contents" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+  </button>
+  <a class="brand" href="#top">
+    <span class="brand-mark">GB</span>
+    <span class="brand-text"><b>GeM Tender Brain</b><span>Product requirements</span></span>
+  </a>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-meta"><span class="dot"></span> v1.0 · MVP complete</div>
+  <button class="icon-btn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle theme">
+    <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="display:none"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8Z"/></svg>
+  </button>
+  <button class="icon-btn" onclick="window.print()" title="Print or save as PDF">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+    <span class="hide-sm">Print</span>
+  </button>
+</header>
+
+<div class="scrim" id="scrim" hidden></div>
+
+<div class="shell" id="top">
+  <aside class="sidebar" id="sidebar" aria-label="Table of contents">
+    <div class="toc-head">Contents <span class="mono">20</span></div>
+    <input class="toc-search" id="tocSearch" type="search" placeholder="Filter sections…" aria-label="Filter sections">
+    <nav id="toc">
+      <div class="toc-group">
+        <div class="toc-label">Product</div>
+        <a class="toc-link" href="#overview"><span class="n">01</span> Overview</a>
+        <a class="toc-link" href="#goals"><span class="n">02</span> Goals &amp; non-goals</a>
+        <a class="toc-link" href="#users"><span class="n">03</span> Users &amp; jobs</a>
+        <a class="toc-link" href="#scope"><span class="n">04</span> Scope</a>
+      </div>
+      <div class="toc-group">
+        <div class="toc-label">System</div>
+        <a class="toc-link" href="#pipeline"><span class="n">05</span> How it works</a>
+        <a class="toc-link" href="#requirements"><span class="n">06</span> Requirements</a>
+        <a class="toc-link" href="#filtering"><span class="n">07</span> Filtering rules</a>
+        <a class="toc-link" href="#scoring"><span class="n">08</span> Scoring model</a>
+        <a class="toc-link" href="#data"><span class="n">09</span> Data model</a>
+        <a class="toc-link" href="#api"><span class="n">10</span> API reference</a>
+      </div>
+      <div class="toc-group">
+        <div class="toc-label">Operations</div>
+        <a class="toc-link" href="#setup"><span class="n">11</span> Setup &amp; run</a>
+        <a class="toc-link" href="#config"><span class="n">12</span> Configuration</a>
+        <a class="toc-link" href="#sheets"><span class="n">13</span> Google Sheets</a>
+        <a class="toc-link" href="#interface"><span class="n">14</span> Interface guide</a>
+        <a class="toc-link" href="#automation"><span class="n">15</span> CLI &amp; automation</a>
+      </div>
+      <div class="toc-group">
+        <div class="toc-label">Reference</div>
+        <a class="toc-link" href="#quality"><span class="n">16</span> Quality</a>
+        <a class="toc-link" href="#risks"><span class="n">17</span> Risks &amp; limits</a>
+        <a class="toc-link" href="#roadmap"><span class="n">18</span> Roadmap</a>
+        <a class="toc-link" href="#faq"><span class="n">19</span> FAQ</a>
+        <a class="toc-link" href="#appendix"><span class="n">20</span> Appendix</a>
+      </div>
+      <div class="toc-empty" id="tocEmpty">No matching section.</div>
+    </nav>
+  </aside>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="doc-title">
+      <div class="hero-grid">
+        <div>
+          <span class="eyebrow"><span class="pulse"></span> Product requirements · v1.0</span>
+          <h1 id="doc-title">GeM Tender Brain</h1>
+          <p class="lede">
+            A local-first workspace that scans GeM, drops the noise, and returns a
+            <strong>short, ranked, explainable shortlist</strong> of tenders worth bidding —
+            with eligibility risks called out before anyone commits time to a bid.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#overview">
+              Read the specification
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+            <a class="btn btn-ghost" href="#setup">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5v14l11-7z"/></svg>
+              Quick start
+            </a>
+          </div>
+          <div class="hero-meta">
+            <span><b>Status</b> MVP complete</span>
+            <span><b>Stack</b> Python · FastAPI · Streamlit</span>
+            <span><b>Updated</b> 25 Nov 2026</span>
+            <span><b>Tests</b> 17 passing</span>
+          </div>
+        </div>
+
+        <div class="hero-panel" aria-label="Example sample run">
+          <div class="hp-head"><span>Last sample run</span><span class="live"><i></i> complete</span></div>
+          <div class="hp-stats">
+            <div><b>34</b><span>bids fetched</span></div>
+            <div><b>25</b><span>matched</span></div>
+            <div><b>69.1</b><span>avg score</span></div>
+          </div>
+          <ul class="hp-list">
+            <li>
+              <span class="hp-score">91</span>
+              <div><strong>Annual Maintenance of Server Room</strong><small>Tamil Nadu · ₹6.0 L · 14 days left</small></div>
+            </li>
+            <li>
+              <span class="hp-score">87</span>
+              <div><strong>Comprehensive AMC for Computers &amp; Printers</strong><small>Gujarat · ₹4.8 L · 11 days left</small></div>
+            </li>
+            <li>
+              <span class="hp-score">84</span>
+              <div><strong>Supply of Biometric Devices &amp; Software</strong><small>Odisha · ₹3.5 L · 7 days left</small></div>
+            </li>
+          </ul>
+          <div class="hp-foot"><span>source: sample dataset</span><span>25 of 34 kept</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid grid-3" style="margin-top:16px">
+      <div class="stat"><b>₹25 L</b><span>Default IT value cap</span><span class="sub">configurable</span></div>
+      <div class="stat"><b>₹50 k</b><span>Default EMD ceiling</span><span class="sub">configurable</span></div>
+      <div class="stat"><b>7 days</b><span>Minimum runway to bid</span><span class="sub">configurable</span></div>
+    </div>
+
+    <!-- ============================================================ 01 -->
+    <section class="section" id="overview">
+      <div class="section-head">
+        <div class="kicker"><span class="num">01</span> Product overview</div>
+        <h2>The shortlist problem <a class="anchor-link" href="#overview" aria-label="Link to overview">#</a></h2>
+        <p>GeM publishes thousands of bids. The expensive part is not finding them — it is deciding, quickly and defensibly, which handful deserve a bid team's week.</p>
+      </div>
+
+      <p class="lede">
+        Tender discovery today is a manual loop: open GeM, page through listings, open PDFs,
+        copy values into a sheet, guess whether the eligibility bar is reachable, and repeat
+        tomorrow. Relevant bids are missed because they close in a few days, and irrelevant
+        ones waste hours because the exclusion only becomes obvious inside the document.
+      </p>
+      <p class="lede">
+        <strong>GeM Tender Brain</strong> turns that loop into a repeatable scan. A configurable
+        search profile is applied to live (or sample) bids, each survivor gets an explainable
+        score, the top documents are parsed for eligibility signals, and the result is a ranked
+        dashboard plus a shareable sheet — in one run.
+      </p>
+
+      <div class="grid grid-3" style="margin-top:20px">
+        <div class="card">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </div>
+          <h3>Recover the hours</h3>
+          <p>Replace daily paging and spreadsheet copying with one scan that filters, scores and summarises in a single pass.</p>
+        </div>
+        <div class="card teal">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+          </div>
+          <h3>Protect the focus</h3>
+          <p>Hard filters remove construction, housekeeping, furniture and vehicle work before it ever reaches the bid team.</p>
+        </div>
+        <div class="card amber">
+          <div class="icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.2-2.9 7.6-7 9-4.1-1.4-7-4.8-7-9V6l7-3z"/><path d="M9.2 12.2l2 2 3.6-4"/></svg>
+          </div>
+          <h3>Surface the risk early</h3>
+          <p>Turnover, experience, OEM and EMD requirements are extracted from the PDF and flagged before a bid is committed.</p>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-top:20px">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+        <p><strong>Positioning.</strong> This is a decision-support tool, not a bidding bot. It never submits a bid, never signs a document, and never invents an eligibility claim. Every summary is traceable to a tender field or the tender PDF.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 02 -->
+    <section class="section" id="goals">
+      <div class="section-head">
+        <div class="kicker"><span class="num">02</span> Goals</div>
+        <h2>What success looks like <a class="anchor-link" href="#goals" aria-label="Link to goals">#</a></h2>
+        <p>Measured on a weekly scan cycle, not on lines of code.</p>
+      </div>
+
+      <div class="split">
+        <div class="panel ok">
+          <h3>Goals</h3>
+          <ul class="list check tight">
+            <li><b>One scan, one shortlist.</b> A complete run produces a ranked, readable list without manual copy-paste.</li>
+            <li><b>Explain every ranking.</b> Each tender shows the exact points added or removed, so a low score can be defended.</li>
+            <li><b>Filter before enrichment.</b> Cheap rules reject obvious mismatches before any PDF download or AI call.</li>
+            <li><b>Never miss a closing date.</b> Bids inside the minimum runway are rejected with a visible reason.</li>
+            <li><b>Degrade gracefully.</b> No API key, no Google account, or a blocked GeM request still leaves a usable run.</li>
+            <li><b>Stay local by default.</b> Settings and results live on disk; cloud services are optional mirrors.</li>
+          </ul>
+        </div>
+        <div class="panel no">
+          <h3>Non-goals</h3>
+          <ul class="list cross tight">
+            <li>Automated bid submission, DSC signing or portal form filling.</li>
+            <li>Guaranteeing eligibility or legal compliance.</li>
+            <li>Replacing a human review of the tender document.</li>
+            <li>Multi-tenant accounts, roles or billing.</li>
+            <li>Real-time streaming of every new GeM bid.</li>
+            <li>Becoming a CRM for post-award contract management.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top:26px">Success metrics</h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Metric</th><th>Target</th><th>How it is observed</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Scan-to-shortlist time</strong></td><td>Under 5 minutes for a 5-page live scan</td><td>Run duration on the dashboard and in <code class="inline">RunRecord.duration_seconds</code></td></tr>
+              <tr><td><strong>Noise rejection</strong></td><td>≥ 60% of fetched bids rejected before enrichment</td><td>Rejection counts returned with every run</td></tr>
+              <tr><td><strong>Shortlist precision</strong></td><td>≥ 8 of 10 top-ranked tenders judged relevant by the bid lead</td><td>Manual spot-check of the top 10 after each weekly run</td></tr>
+              <tr><td><strong>Eligibility coverage</strong></td><td>Turnover, experience, MSE, OEM and EMD checked for every parsed PDF</td><td><code class="inline">eligibility</code> map and <code class="inline">eligibility_flags</code> on each tender</td></tr>
+              <tr><td><strong>Run reliability</strong></td><td>100% of scheduled runs finish with a saved record</td><td><code class="inline">data/runs/</code> history and CLI exit code</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 03 -->
+    <section class="section" id="users">
+      <div class="section-head">
+        <div class="kicker"><span class="num">03</span> Users &amp; jobs</div>
+        <h2>Who it is for <a class="anchor-link" href="#users" aria-label="Link to users">#</a></h2>
+        <p>A small team with a narrow service catalogue and a hard ceiling on bid effort.</p>
+      </div>
+
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="tag brand">Primary</span>
+          <h3 style="margin-top:10px">Founder / BD lead</h3>
+          <p>Owns the bid pipeline and decides where the week goes. Needs a trustworthy top-10, not another dashboard to maintain.</p>
+        </div>
+        <div class="card">
+          <span class="tag blue">Primary</span>
+          <h3 style="margin-top:10px">Bid manager</h3>
+          <p>Reads the documents, checks eligibility and assembles submissions. Needs the risk list and source links in one place.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Secondary</span>
+          <h3 style="margin-top:10px">Developer / operator</h3>
+          <p>Runs and schedules the scans, tunes the profile, and keeps the GeM integration healthy.</p>
+        </div>
+      </div>
+
+      <h3 style="margin-top:26px">Jobs to be done</h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>When…</th><th>I want to…</th><th>So that…</th></tr></thead>
+            <tbody>
+              <tr><td>Starting the week</td><td>run one scan and read a ranked shortlist</td><td>the team spends its time on bids we can actually win</td></tr>
+              <tr><td>A tender looks promising</td><td>see the score breakdown and eligibility flags</td><td>I can decide in minutes whether to open the PDF</td></tr>
+              <tr><td>The profile changes</td><td>adjust caps, states and keywords in the UI</td><td>the next scan reflects the new strategy without code changes</td></tr>
+              <tr><td>Sharing with stakeholders</td><td>export the run to Google Sheets or CSV</td><td>non-technical colleagues can review without the app</td></tr>
+              <tr><td>A scan fails</td><td>read a clear reason and fall back to sample mode</td><td>the pipeline can still be tested and demonstrated</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 04 -->
+    <section class="section" id="scope">
+      <div class="section-head">
+        <div class="kicker"><span class="num">04</span> Scope</div>
+        <h2>What v1.0 delivers <a class="anchor-link" href="#scope" aria-label="Link to scope">#</a></h2>
+        <p>Everything below is implemented and verified in the current build.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Capability</th><th>In v1.0</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Configurable search profile</strong></td><td><span class="tag green">Shipped</span></td><td>Categories, keywords, states, caps, runway, bid type, score floor</td></tr>
+              <tr><td><strong>Live GeM fetch</strong></td><td><span class="tag green">Shipped</span></td><td>Browser-like requests with pagination and normalisation</td></tr>
+              <tr><td><strong>Playwright fallback</strong></td><td><span class="tag amber">Optional</span></td><td>Enabled by env flag; requires the optional dependency</td></tr>
+              <tr><td><strong>Offline sample dataset</strong></td><td><span class="tag green">Shipped</span></td><td>Clearly labelled <code class="inline">sample</code>; never mixed with live bids</td></tr>
+              <tr><td><strong>Hard filters + scoring</strong></td><td><span class="tag green">Shipped</span></td><td>Per-tender score breakdown shown in the UI</td></tr>
+              <tr><td><strong>PDF eligibility extraction</strong></td><td><span class="tag green">Shipped</span></td><td>Top N tenders; re-scores after parsing</td></tr>
+              <tr><td><strong>AI summaries</strong></td><td><span class="tag green">Shipped</span></td><td>Groq when configured, deterministic rules otherwise</td></tr>
+              <tr><td><strong>Dashboard + detail view</strong></td><td><span class="tag green">Shipped</span></td><td>Search, group/state filters, score slider, CSV download</td></tr>
+              <tr><td><strong>Google Sheets export</strong></td><td><span class="tag green">Shipped</span></td><td>Settings mirror + results tab, overwritten per run</td></tr>
+              <tr><td><strong>Run history</strong></td><td><span class="tag green">Shipped</span></td><td>JSON records with progress polling and re-export</td></tr>
+              <tr><td><strong>CLI + scheduled runs</strong></td><td><span class="tag green">Shipped</span></td><td>GitHub Actions workflow template included</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4l9 16H3L12 4z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+        <p><strong>Explicitly out of scope:</strong> bid submission, digital signatures, GeM login automation, payment of EMD, contract management, and any guarantee of eligibility. The output is a shortlist and a risk list — the bid decision remains human.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 05 -->
+    <section class="section" id="pipeline">
+      <div class="section-head">
+        <div class="kicker"><span class="num">05</span> How it works</div>
+        <h2>One run, seven stages <a class="anchor-link" href="#pipeline" aria-label="Link to pipeline">#</a></h2>
+        <p>Cheap work happens first. PDF downloads and model calls only run for tenders that survive filtering and scoring.</p>
+      </div>
+
+      <div class="pipe">
+        <div class="pipe-item">
+          <div class="pipe-num">01</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Load the search profile</h4><span class="tag">settings</span></div>
+            <p>The saved profile is loaded from <code class="inline">data/settings.json</code>. The UI, CLI and scheduler all use the same schema and validators.</p>
+            <span class="file">backend/models.py · backend/storage.py</span>
+          </div>
+        </div>
+        <div class="pipe-item">
+          <div class="pipe-num">02</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Fetch bids</h4><span class="tag teal">~3%</span></div>
+            <p>Requests the GeM listing endpoint with browser-like headers and pagination. If blocked, it optionally retries inside a headless Chromium session.</p>
+            <span class="file">backend/gem_client.py</span>
+          </div>
+        </div>
+        <div class="pipe-item">
+          <div class="pipe-num">03</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Normalise and dedupe</h4><span class="tag teal">~20%</span></div>
+            <p>Maps inconsistent GeM fields into one <code class="inline">Tender</code> shape, parses rupee amounts and dates, and removes duplicate bid numbers.</p>
+            <span class="file">backend/gem_client.py · backend/utils.py</span>
+          </div>
+        </div>
+        <div class="pipe-item">
+          <div class="pipe-num">04</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Filter and score</h4><span class="tag teal">~32%</span></div>
+            <p>Hard rules reject mismatches. Survivors are classified, scored and sorted. Rejection reasons are counted and returned with the run.</p>
+            <span class="file">backend/scoring.py</span>
+          </div>
+        </div>
+        <div class="pipe-item">
+          <div class="pipe-num">05</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Read the top PDFs</h4><span class="tag teal">38–62%</span></div>
+            <p>Downloads the tender document for the top N matches, extracts text with pdfplumber, and pulls eligibility signals. Real EMD/value can trigger a re-score.</p>
+            <span class="file">backend/pdf_parser.py</span>
+          </div>
+        </div>
+        <div class="pipe-item">
+          <div class="pipe-num">06</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Write summaries</h4><span class="tag teal">66–86%</span></div>
+            <p>Groq produces a short factual summary for the top N. Without a key, or on failure, a deterministic rule-based summary is used instead.</p>
+            <span class="file">backend/summarizer.py</span>
+          </div>
+        </div>
+        <div class="pipe-item">
+          <div class="pipe-num">07</div>
+          <div class="pipe-body">
+            <div class="pt"><h4>Save and export</h4><span class="tag teal">90–100%</span></div>
+            <p>The run is written atomically to <code class="inline">data/runs/</code>. If enabled, the Settings and Tenders tabs are mirrored to Google Sheets.</p>
+            <span class="file">backend/storage.py · backend/sheets.py</span>
+          </div>
+        </div>
+      </div>
+
+      <h3 style="margin-top:30px">System architecture</h3>
+      <div class="arch">
+        <div class="arch-layer">
+          <div class="arch-label"><span>Experience layer</span><span>Streamlit · :8501</span></div>
+          <div class="arch-nodes">
+            <div class="arch-node">Dashboard<small>ranked shortlist</small></div>
+            <div class="arch-node">Settings<small>search profile</small></div>
+            <div class="arch-node">Run history<small>saved records</small></div>
+            <div class="arch-node">How it works<small>in-app help</small></div>
+          </div>
+        </div>
+        <div class="arch-link"><em>HTTP · JSON</em></div>
+        <div class="arch-layer hot">
+          <div class="arch-label"><span>API layer</span><span>FastAPI · :8000</span></div>
+          <div class="arch-nodes">
+            <div class="arch-node core">/api/run<small>background scan</small></div>
+            <div class="arch-node core">/api/settings<small>read / save</small></div>
+            <div class="arch-node core">/api/runs<small>history</small></div>
+            <div class="arch-node core">/api/export<small>Sheets mirror</small></div>
+          </div>
+        </div>
+        <div class="arch-link"><em>in-process</em></div>
+        <div class="arch-layer">
+          <div class="arch-label"><span>Core layer</span><span>Python pipeline</span></div>
+          <div class="arch-nodes">
+            <div class="arch-node">gem_client<small>fetch + normalise</small></div>
+            <div class="arch-node">scoring<small>filters + weights</small></div>
+            <div class="arch-node">pdf_parser<small>eligibility</small></div>
+            <div class="arch-node">summarizer<small>Groq + rules</small></div>
+            <div class="arch-node">sheets<small>export</small></div>
+          </div>
+        </div>
+        <div class="arch-link"><em>network / disk</em></div>
+        <div class="arch-layer">
+          <div class="arch-label"><span>External services &amp; storage</span><span>optional</span></div>
+          <div class="arch-nodes">
+            <div class="arch-node">GeM<small>bid listings + PDFs</small></div>
+            <div class="arch-node">Groq<small>summaries</small></div>
+            <div class="arch-node">Google Sheets<small>export mirror</small></div>
+            <div class="arch-node">Local JSON<small>settings + runs</small></div>
+          </div>
+        </div>
+      </div>
+      <p class="table-note">The UI never talks to GeM directly. All network and scoring work sits behind the API, so the CLI and scheduler reuse exactly the same pipeline.</p>
+    </section>
+
+    <!-- ============================================================ 06 -->
+    <section class="section" id="requirements">
+      <div class="section-head">
+        <div class="kicker"><span class="num">06</span> Requirements</div>
+        <h2>Functional requirements <a class="anchor-link" href="#requirements" aria-label="Link to requirements">#</a></h2>
+        <p>P0 requirements are required for a usable run; P1 requirements improve trust and shareability.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th style="width:78px">ID</th><th>Requirement</th><th>Acceptance criteria</th><th style="width:52px">Prio</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="mono">FR-01</span></td>
+                <td><strong>Search profile</strong><br><span class="small muted">Categories, keywords, region, states, caps, runway, bid type, score floor, enrichment depth.</span></td>
+                <td>Editable in the UI, validated by Pydantic, persisted to disk, and reused by API and CLI runs.</td>
+                <td><span class="tag red">P0</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-02</span></td>
+                <td><strong>Bid acquisition</strong><br><span class="small muted">Live GeM fetch, optional browser fallback, offline sample dataset.</span></td>
+                <td>Every run declares its source. Sample bids are never presented as live, and a fetch failure leaves a readable error.</td>
+                <td><span class="tag red">P0</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-03</span></td>
+                <td><strong>Hard filtering</strong><br><span class="small muted">Exclusions, closing window, value caps, EMD cap, bid type, region.</span></td>
+                <td>Rejected tenders never reach scoring or PDF work, and each rejection reason is counted.</td>
+                <td><span class="tag red">P0</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-04</span></td>
+                <td><strong>Explainable scoring</strong><br><span class="small muted">Positive signals and risk penalties, shown line by line.</span></td>
+                <td>Every displayed score can be reconstructed from its breakdown; totals never go below zero.</td>
+                <td><span class="tag red">P0</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-05</span></td>
+                <td><strong>PDF enrichment</strong><br><span class="small muted">Download cap, text extraction, eligibility signals, re-score.</span></td>
+                <td>Top N tenders are parsed within the size cap; a failed PDF is logged without failing the run.</td>
+                <td><span class="tag blue">P1</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-06</span></td>
+                <td><strong>Summaries</strong><br><span class="small muted">Groq when available, deterministic rules otherwise.</span></td>
+                <td>Summary source is recorded; no summary asserts eligibility that is not present in the source text.</td>
+                <td><span class="tag blue">P1</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-07</span></td>
+                <td><strong>Ranked workspace</strong><br><span class="small muted">Dashboard table, detail card, score breakdown, source links.</span></td>
+                <td>Search and filters work without re-running the scan; CSV export matches the visible shortlist.</td>
+                <td><span class="tag red">P0</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-08</span></td>
+                <td><strong>Shareable output</strong><br><span class="small muted">Google Sheets mirror and CSV.</span></td>
+                <td>Export is idempotent: reruns overwrite the same tabs instead of duplicating rows.</td>
+                <td><span class="tag blue">P1</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-09</span></td>
+                <td><strong>Background runs</strong><br><span class="small muted">Threaded execution with pollable progress and history.</span></td>
+                <td>The UI stays responsive; a second concurrent run is refused with HTTP 409.</td>
+                <td><span class="tag blue">P1</span></td>
+              </tr>
+              <tr>
+                <td><span class="mono">FR-10</span></td>
+                <td><strong>Headless operation</strong><br><span class="small muted">CLI run/export commands and a scheduled workflow template.</span></td>
+                <td>A scheduled run produces a saved record and a CSV artifact without the UI.</td>
+                <td><span class="tag blue">P1</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+        <p><strong>Non-functional baseline.</strong> Runs on Windows, macOS and Linux with Python 3.11+. No database. All external calls have timeouts, PDF downloads have a byte cap, and every persisted write is atomic.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 07 -->
+    <section class="section" id="filtering">
+      <div class="section-head">
+        <div class="kicker"><span class="num">07</span> Filtering</div>
+        <h2>Hard rules, applied in order <a class="anchor-link" href="#filtering" aria-label="Link to filtering">#</a></h2>
+        <p>A tender must pass every rule. The first failure is recorded as the rejection reason.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th style="width:34px">#</th><th>Rule</th><th>Default</th><th>Rejection label</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td><strong>Excluded keyword</strong> appears in title or category</td><td>construction, civil, furniture, vehicle hire, security guard, housekeeping, catering, gardening, plumbing, electrical works, painting, road work, building work, manpower supply</td><td><span class="mono">excluded keyword: …</span></td></tr>
+              <tr><td>2</td><td><strong>Closing too soon</strong></td><td>Fewer than <code class="inline">min_days_remaining</code> = 7 days</td><td><span class="mono">closing too soon</span></td></tr>
+              <tr><td>3</td><td><strong>Category relevance</strong></td><td>Must match a configured IT or other category/keyword</td><td><span class="mono">not relevant to configured categories</span></td></tr>
+              <tr><td>4</td><td><strong>Value cap</strong></td><td>₹25,00,000 IT · ₹5,00,000 other</td><td><span class="mono">value above limit</span></td></tr>
+              <tr><td>5</td><td><strong>EMD cap</strong></td><td>₹50,000</td><td><span class="mono">EMD above limit</span></td></tr>
+              <tr><td>6</td><td><strong>Bid type</strong> (only when configured)</td><td>Product / Service, empty means any</td><td><span class="mono">bid type mismatch</span></td></tr>
+              <tr><td>7</td><td><strong>Region</strong> (only when not All India)</td><td>Selected region plus preferred states</td><td><span class="mono">outside selected region</span></td></tr>
+              <tr><td>8</td><td><strong>Score floor</strong></td><td>25 points</td><td><span class="mono">score below threshold</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid grid-2" style="margin-top:16px">
+        <div class="card">
+          <h3>Why filters run before enrichment</h3>
+          <p>PDF downloads and model calls are the slow, failure-prone parts of a scan. Rejecting obvious mismatches first keeps a typical run in seconds instead of minutes, and keeps request volume low.</p>
+        </div>
+        <div class="card">
+          <h3>Why reasons are counted</h3>
+          <p>Rejection counts reveal a misconfigured profile. If most bids are dropped as “value above limit”, the cap is too tight; if “not relevant” dominates, the keyword list is too narrow.</p>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4l9 16H3L12 4z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+        <p><strong>Exclusions are literal substring matches.</strong> “civil” will also reject “civil supplies” unless the keyword is tightened. Review the rejection counts after changing the profile and prefer specific phrases.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 08 -->
+    <section class="section" id="scoring">
+      <div class="section-head">
+        <div class="kicker"><span class="num">08</span> Scoring</div>
+        <h2>An explainable 100-point model <a class="anchor-link" href="#scoring" aria-label="Link to scoring">#</a></h2>
+        <p>Weights encode the company's strategy: IT services first, comfortable commercials second, physical works penalised hard.</p>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>Positive signals</h3>
+          <div class="table-wrap" style="margin:10px 0 0; border:0">
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Signal</th><th class="num-col">Points</th></tr></thead>
+                <tbody>
+                  <tr><td>Relevant category match (baseline)</td><td class="num-col"><strong>+10</strong></td></tr>
+                  <tr><td>IT focus (company priority)</td><td class="num-col"><strong>+5</strong></td></tr>
+                  <tr><td>Configured category hit</td><td class="num-col"><strong>+22</strong></td></tr>
+                  <tr><td>Keyword matches, 11 each</td><td class="num-col"><strong>+33 max</strong></td></tr>
+                  <tr><td>Preferred state</td><td class="num-col"><strong>+14</strong></td></tr>
+                  <tr><td>Inside selected region (not preferred)</td><td class="num-col"><strong>+8</strong></td></tr>
+                  <tr><td>All-India location</td><td class="num-col"><strong>+2</strong></td></tr>
+                  <tr><td>Value ≤ 35% / ≤ 70% / ≤ 90% of cap</td><td class="num-col"><strong>+8 / +5 / +2</strong></td></tr>
+                  <tr><td>EMD nil / ≤ 50% cap / within cap / not listed</td><td class="num-col"><strong>+8 / +5 / +2 / +1</strong></td></tr>
+                  <tr><td>Good time to prepare (≥ floor + 7 days)</td><td class="num-col"><strong>+4</strong></td></tr>
+                  <tr><td>Buyer department identified</td><td class="num-col"><strong>+2</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Risk penalties</h3>
+          <div class="table-wrap" style="margin:10px 0 0; border:0">
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Signal</th><th class="num-col">Points</th></tr></thead>
+                <tbody>
+                  <tr><td>Construction / civil work</td><td class="num-col"><strong>−45</strong></td></tr>
+                  <tr><td>Building work / road work / security guard</td><td class="num-col"><strong>−40</strong></td></tr>
+                  <tr><td>Civil / housekeeping / catering / vehicle hire / plumbing</td><td class="num-col"><strong>−35</strong></td></tr>
+                  <tr><td>Furniture / gardening</td><td class="num-col"><strong>−30</strong></td></tr>
+                  <tr><td>Electrical works</td><td class="num-col"><strong>−25</strong></td></tr>
+                  <tr><td>Turnover ≥ ₹5 crore / ≥ ₹1 crore / ≥ ₹50 lakh</td><td class="num-col"><strong>−25 / −14 / −7</strong></td></tr>
+                  <tr><td>5+ years experience required</td><td class="num-col"><strong>−8</strong></td></tr>
+                  <tr><td>OEM / authorisation certificate required</td><td class="num-col"><strong>−4</strong></td></tr>
+                  <tr><td>Submission window is tight (≤ floor + 2 days)</td><td class="num-col"><strong>−3</strong></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="table-note" style="margin-top:10px">Weights live in <code class="inline">backend/scoring.py</code>; risk terms live in <code class="inline">backend/constants.py</code>. The total is clamped at zero, then compared with <code class="inline">min_score</code> (default 25).</p>
+
+      <h3 style="margin-top:26px">Worked example</h3>
+      <div class="card score-card">
+        <div class="score-top">
+          <div>
+            <span class="tag brand">Example tender</span>
+            <h3 style="margin:8px 0 2px">Development of Website &amp; Web Portal</h3>
+            <p class="small muted" style="margin:0">Maharashtra · ₹8,00,000 · EMD nil · 15 days left · Municipal Corporation</p>
+          </div>
+          <div class="score-total"><b>95</b><span>/ 106 theoretical max</span></div>
+        </div>
+        <div class="score-bars">
+          <div class="bar-row"><span class="lbl">Category: Website Development</span><div class="bar-track"><div class="bar-fill" style="width:88%"></div></div><span class="val">+22</span></div>
+          <div class="bar-row"><span class="lbl">Keywords: website, web portal</span><div class="bar-track"><div class="bar-fill" style="width:88%"></div></div><span class="val">+22</span></div>
+          <div class="bar-row"><span class="lbl">Preferred state: Maharashtra</span><div class="bar-track"><div class="bar-fill" style="width:56%"></div></div><span class="val">+14</span></div>
+          <div class="bar-row"><span class="lbl">Relevant category match</span><div class="bar-track"><div class="bar-fill" style="width:40%"></div></div><span class="val">+10</span></div>
+          <div class="bar-row"><span class="lbl">Well below value limit</span><div class="bar-track"><div class="bar-fill" style="width:32%"></div></div><span class="val">+8</span></div>
+          <div class="bar-row"><span class="lbl">No EMD required</span><div class="bar-track"><div class="bar-fill" style="width:32%"></div></div><span class="val">+8</span></div>
+          <div class="bar-row"><span class="lbl">IT focus</span><div class="bar-track"><div class="bar-fill" style="width:20%"></div></div><span class="val">+5</span></div>
+          <div class="bar-row"><span class="lbl">Good time to prepare</span><div class="bar-track"><div class="bar-fill" style="width:16%"></div></div><span class="val">+4</span></div>
+          <div class="bar-row"><span class="lbl">Buyer department identified</span><div class="bar-track"><div class="bar-fill" style="width:8%"></div></div><span class="val">+2</span></div>
+        </div>
+        <div class="score-foot">
+          <span>Threshold: <strong>25</strong></span>
+          <span>Decision: <strong>bid candidate</strong></span>
+          <span>Risks: <strong>none detected</strong></span>
+        </div>
+      </div>
+
+      <div class="callout">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+        <p><strong>Scoring is a sorting aid, not a verdict.</strong> A high score means “read this first”, not “we are eligible”. The PDF enrichment step exists precisely because the listing rarely contains the real turnover, experience and OEM conditions.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 09 -->
+    <section class="section" id="data">
+      <div class="section-head">
+        <div class="kicker"><span class="num">09</span> Data model</div>
+        <h2>Plain JSON, validated by Pydantic <a class="anchor-link" href="#data" aria-label="Link to data model">#</a></h2>
+        <p>No database. Three models cover the whole product: the profile, the tender, and the run record.</p>
+      </div>
+
+      <h3>Search profile — <span class="mono">Settings</span></h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Field</th><th>Default</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono">region</span></td><td>All India</td><td>Broad location scope</td></tr>
+              <tr><td><span class="mono">preferred_states</span></td><td>empty</td><td>States that earn the +14 location bonus</td></tr>
+              <tr><td><span class="mono">max_value_it</span></td><td>2,500,000</td><td>IT value ceiling in rupees</td></tr>
+              <tr><td><span class="mono">max_value_other</span></td><td>500,000</td><td>Non-IT value ceiling in rupees</td></tr>
+              <tr><td><span class="mono">max_emd</span></td><td>50,000</td><td>EMD ceiling in rupees</td></tr>
+              <tr><td><span class="mono">min_days_remaining</span></td><td>7</td><td>Minimum runway before the closing date</td></tr>
+              <tr><td><span class="mono">keywords_it</span> / <span class="mono">keywords_other</span></td><td>40 / 15 seeded terms</td><td>Classification and keyword bonus</td></tr>
+              <tr><td><span class="mono">categories_it</span> / <span class="mono">categories_other</span></td><td>14 / 10 categories</td><td>Category hit bonus and relevance check</td></tr>
+              <tr><td><span class="mono">exclude_keywords</span></td><td>15 seeded terms</td><td>Hard rejection</td></tr>
+              <tr><td><span class="mono">bid_types</span></td><td>empty (any)</td><td>Product and/or Service</td></tr>
+              <tr><td><span class="mono">min_score</span></td><td>25</td><td>Shortlist floor</td></tr>
+              <tr><td><span class="mono">max_pages</span></td><td>5</td><td>GeM pagination limit, 1–50</td></tr>
+              <tr><td><span class="mono">parse_pdf_top_n</span> / <span class="mono">summarize_top_n</span></td><td>10 / 10</td><td>Enrichment depth, 0–100</td></tr>
+              <tr><td><span class="mono">use_sample_data</span></td><td>false</td><td>Force the offline dataset</td></tr>
+              <tr><td><span class="mono">enable_pdf</span> / <span class="mono">enable_ai_summary</span> / <span class="mono">enable_google_sheets</span></td><td>true / true / false</td><td>Per-run feature switches</td></tr>
+              <tr><td><span class="mono">sheet_id</span> / <span class="mono">sheet_tab</span></td><td>empty / “Tenders”</td><td>Google Sheets target</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style="margin-top:24px">Tender — <span class="mono">Tender</span></h3>
+      <div class="grid grid-3">
+        <div class="panel">
+          <h4>Identity</h4>
+          <ul class="list tight small">
+            <li><span class="mono">bid_number</span>, <span class="mono">title</span></li>
+            <li><span class="mono">category</span>, <span class="mono">raw_category</span></li>
+            <li><span class="mono">category_group</span> (it / other / unknown)</li>
+            <li><span class="mono">bid_type</span>, <span class="mono">department</span>, <span class="mono">ministry</span></li>
+            <li><span class="mono">state</span>, <span class="mono">city</span>, <span class="mono">quantity</span></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h4>Commercials &amp; dates</h4>
+          <ul class="list tight small">
+            <li><span class="mono">estimated_value</span>, <span class="mono">emd</span></li>
+            <li><span class="mono">start_date</span>, <span class="mono">end_date</span>, <span class="mono">opening_date</span></li>
+            <li><span class="mono">days_remaining</span></li>
+            <li><span class="mono">offer_validity</span></li>
+            <li><span class="mono">link</span>, <span class="mono">pdf_url</span>, <span class="mono">source</span></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h4>Enrichment</h4>
+          <ul class="list tight small">
+            <li><span class="mono">score</span>, <span class="mono">score_breakdown[]</span></li>
+            <li><span class="mono">matched_keywords[]</span></li>
+            <li><span class="mono">summary</span>, <span class="mono">summary_source</span></li>
+            <li><span class="mono">eligibility{}</span>, <span class="mono">eligibility_flags[]</span></li>
+            <li><span class="mono">pdf_parsed</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top:24px">Run record — <span class="mono">RunRecord</span></h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Field</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono">run_id</span></td><td>Timestamp plus short hash, e.g. <span class="mono">20261125T215847-5ccb24</span></td></tr>
+              <tr><td><span class="mono">status</span></td><td><code class="inline">running</code> · <code class="inline">done</code> · <code class="inline">error</code></td></tr>
+              <tr><td><span class="mono">started_at</span> / <span class="mono">finished_at</span></td><td>ISO timestamps for the audit trail</td></tr>
+              <tr><td><span class="mono">source</span></td><td><code class="inline">gem</code> or <code class="inline">sample</code> — never mixed</td></tr>
+              <tr><td><span class="mono">settings</span></td><td>Full profile snapshot, so old runs remain reproducible</td></tr>
+              <tr><td><span class="mono">total_fetched</span> / <span class="mono">total_matched</span></td><td>Input volume and shortlist size</td></tr>
+              <tr><td><span class="mono">rejections</span></td><td>Map of rejection reason → count</td></tr>
+              <tr><td><span class="mono">tenders[]</span></td><td>The full shortlist with scores, summaries and eligibility</td></tr>
+              <tr><td><span class="mono">errors[]</span></td><td>Non-fatal notes, such as a PDF that could not be read</td></tr>
+              <tr><td><span class="mono">sheet{}</span></td><td>Google Sheets export result or skip reason</td></tr>
+              <tr><td><span class="mono">duration_seconds</span></td><td>Wall-clock run time</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">data/runs/&lt;run_id&gt;.json</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code>{
+  <span class="s">"run_id"</span>: <span class="s">"20261125T215847-5ccb24"</span>,
+  <span class="s">"status"</span>: <span class="s">"done"</span>,
+  <span class="s">"started_at"</span>: <span class="s">"2026-11-25T21:58:47"</span>,
+  <span class="s">"finished_at"</span>: <span class="s">"2026-11-25T21:58:49"</span>,
+  <span class="s">"source"</span>: <span class="s">"sample"</span>,
+  <span class="s">"total_fetched"</span>: <span class="n">34</span>,
+  <span class="s">"total_matched"</span>: <span class="n">25</span>,
+  <span class="s">"rejections"</span>: { <span class="s">"excluded keyword: construction"</span>: <span class="n">1</span>, <span class="s">"value above limit"</span>: <span class="n">1</span> },
+  <span class="s">"tenders"</span>: [ { <span class="s">"bid_number"</span>: <span class="s">"GEM/2026/B/…"</span>, <span class="s">"score"</span>: <span class="n">91.0</span> } ],
+  <span class="s">"duration_seconds"</span>: <span class="n">1.4</span>
+}</code></pre>
+      </div>
+    </section>
+
+    <!-- ============================================================ 10 -->
+    <section class="section" id="api">
+      <div class="section-head">
+        <div class="kicker"><span class="num">10</span> API</div>
+        <h2>Ten endpoints, one job each <a class="anchor-link" href="#api" aria-label="Link to API">#</a></h2>
+        <p>FastAPI serves JSON on <code class="inline">127.0.0.1:8000</code>. Interactive docs are available at <code class="inline">/docs</code>.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th style="width:64px">Method</th><th>Path</th><th>Purpose</th><th>Returns</th></tr></thead>
+            <tbody>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/health</span></td><td>Liveness, version and data directory</td><td><span class="mono">HealthResponse</span></td></tr>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/meta</span></td><td>Categories, states, bid types, capability flags</td><td><span class="mono">ApiMeta</span></td></tr>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/settings</span></td><td>Load the saved search profile</td><td><span class="mono">Settings</span></td></tr>
+              <tr><td><span class="tag green">PUT</span></td><td><span class="mono">/api/settings</span></td><td>Validate and save a profile</td><td><span class="mono">Settings</span></td></tr>
+              <tr><td><span class="tag amber">POST</span></td><td><span class="mono">/api/run</span></td><td>Start a background scan</td><td><span class="mono">RunStatus</span></td></tr>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/run/status</span></td><td>Poll progress, stage, counts</td><td><span class="mono">RunStatus</span></td></tr>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/runs</span></td><td>Recent run summaries (<span class="mono">?limit=25</span>)</td><td>Array of summaries</td></tr>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/runs/latest</span></td><td>Full latest run record</td><td><span class="mono">RunRecord</span></td></tr>
+              <tr><td><span class="tag blue">GET</span></td><td><span class="mono">/api/runs/{run_id}</span></td><td>One stored run by id</td><td><span class="mono">RunRecord</span></td></tr>
+              <tr><td><span class="tag amber">POST</span></td><td><span class="mono">/api/export</span></td><td>Re-export a run to Google Sheets</td><td>Export result</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <div>
+          <h4>Start a sample scan</h4>
+          <div class="code">
+            <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">POST /api/run</span><button class="copy-btn" type="button">Copy</button></div>
+            <pre><code>{
+  <span class="s">"use_sample"</span>: <span class="k">true</span>
+}</code></pre>
+          </div>
+          <h4>Poll progress</h4>
+          <div class="code">
+            <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">GET /api/run/status</span><button class="copy-btn" type="button">Copy</button></div>
+            <pre><code>{
+  <span class="s">"status"</span>: <span class="s">"running"</span>,
+  <span class="s">"progress"</span>: <span class="n">66</span>,
+  <span class="s">"stage"</span>: <span class="s">"summarize"</span>,
+  <span class="s">"message"</span>: <span class="s">"Summarized 10/24 tenders"</span>,
+  <span class="s">"matched"</span>: <span class="n">0</span>,
+  <span class="s">"fetched"</span>: <span class="n">34</span>
+}</code></pre>
+          </div>
+        </div>
+        <div>
+          <h4>Failure modes</h4>
+          <div class="table-wrap" style="margin-top:10px">
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Status</th><th>When</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="tag amber">409</span></td><td>A run is already in progress</td></tr>
+                  <tr><td><span class="tag red">404</span></td><td>No saved runs, or unknown <span class="mono">run_id</span></td></tr>
+                  <tr><td><span class="tag red">400</span></td><td>Google Sheets export failed or is not configured</td></tr>
+                  <tr><td><span class="tag red">422</span></td><td>Invalid settings payload (Pydantic validation)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="callout" style="margin-top:14px">
+            <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+            <p>CORS is open because the API is intended for a local, single-user deployment. Do not expose it to the public internet without adding authentication and tightening origins.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 11 -->
+    <section class="section" id="setup">
+      <div class="section-head">
+        <div class="kicker"><span class="num">11</span> Setup</div>
+        <h2>Running it locally <a class="anchor-link" href="#setup" aria-label="Link to setup">#</a></h2>
+        <p>Two processes, one virtual environment, no database. The first run works offline.</p>
+      </div>
+
+      <div class="grid grid-3" style="margin-bottom:18px">
+        <div class="card"><h3>Prerequisites</h3><p>Python 3.11 or newer, pip, and a modern browser. Optional: a Groq key and a Google service account.</p></div>
+        <div class="card"><h3>Ports</h3><p>Backend <code class="inline">:8000</code>, frontend <code class="inline">:8501</code>. Both bind to localhost by default.</p></div>
+        <div class="card"><h3>First run</h3><p>Sample mode is enabled in the UI, so no network access to GeM is required to verify the pipeline.</p></div>
+      </div>
+
+      <h4>1 · Create the environment</h4>
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">PowerShell · project root</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="k">cd</span> C:\projects\gem_automation
+
+<span class="k">python</span> -m venv .venv
+.<span class="s">\.venv\Scripts\Activate.ps1</span>
+
+<span class="c"># If script execution is blocked:</span>
+<span class="c"># Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</span>
+
+<span class="k">python</span> -m pip install --upgrade pip
+<span class="k">pip</span> install -r requirements.txt
+
+<span class="k">Copy-Item</span> .env.example .env</code></pre>
+      </div>
+
+      <h4>2 · Start both processes</h4>
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">terminal 1 — API</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="k">python</span> run_backend.py
+<span class="c"># → http://127.0.0.1:8000  ·  docs at /docs</span></code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">terminal 2 — UI</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="k">python</span> run_frontend.py
+<span class="c"># → http://127.0.0.1:8501</span></code></pre>
+      </div>
+
+      <h4>3 · Verify</h4>
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">PowerShell</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="k">Invoke-RestMethod</span> http://127.0.0.1:8000/api/health
+<span class="c"># status  : ok</span>
+<span class="c"># version : 1.0.0</span>
+
+<span class="k">Start-Process</span> http://127.0.0.1:8501</code></pre>
+      </div>
+
+      <div class="callout ok">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+        <p><strong>Expected first result:</strong> with sample mode on, a scan returns 34 fetched bids and 25 matched tenders. If you see that, the whole pipeline — filtering, scoring, summaries, storage and UI — is working.</p>
+      </div>
+
+      <p class="small muted">Google Sheets is optional. Once the credentials are in place, follow the walkthrough in <a href="#service-account">section 13</a> and confirm with <code class="inline">python -m backend.cli export</code>.</p>
+
+      <p class="small muted">macOS/Linux: replace the activation line with <code class="inline">source .venv/bin/activate</code> and use <code class="inline">cp .env.example .env</code>.</p>
+    </section>
+
+    <!-- ============================================================ 12 -->
+    <section class="section" id="config">
+      <div class="section-head">
+        <div class="kicker"><span class="num">12</span> Configuration</div>
+        <h2>Environment variables <a class="anchor-link" href="#config" aria-label="Link to configuration">#</a></h2>
+        <p>Everything is optional. Credentials belong in <code class="inline">.env</code> locally and in repository secrets for CI — never in code.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono">GROQ_API_KEY</span></td><td>empty</td><td>Enables AI summaries. Without it, rule-based summaries are used.</td></tr>
+              <tr><td><span class="mono">GROQ_MODEL</span></td><td>llama-3.3-70b-versatile</td><td>Model used for summaries; reasoning models such as <span class="mono">openai/gpt-oss-20b</span> are supported</td></tr>
+              <tr><td><span class="mono">GROQ_MAX_TOKENS</span></td><td>800</td><td>Completion budget; reasoning models spend part of it on hidden reasoning</td></tr>
+              <tr><td><span class="mono">GROQ_REASONING_EFFORT</span></td><td>low</td><td>Sent only for <span class="mono">gpt-oss</span> models (low / medium / high)</td></tr>
+              <tr><td><span class="mono">GROQ_ENDPOINT</span></td><td>Groq chat completions URL</td><td>Override for a compatible gateway</td></tr>
+              <tr><td><span class="mono">GOOGLE_SERVICE_ACCOUNT_JSON</span></td><td>empty</td><td>Path to the key file, or the JSON itself for CI</td></tr>
+              <tr><td><span class="mono">GOOGLE_SHEET_ID</span></td><td>empty</td><td>Default spreadsheet id; the UI can override it</td></tr>
+              <tr><td><span class="mono">ALLOW_PLAYWRIGHT_FALLBACK</span></td><td>false</td><td>Retry a blocked GeM request in headless Chromium</td></tr>
+              <tr><td><span class="mono">GEM_SAMPLE_MODE</span></td><td>false</td><td>Force sample data for every run</td></tr>
+              <tr><td><span class="mono">GEM_SAMPLE_FALLBACK</span></td><td>true</td><td>Fall back to sample data when live fetch fails</td></tr>
+              <tr><td><span class="mono">GEM_TIMEOUT</span></td><td>30</td><td>HTTP timeout in seconds</td></tr>
+              <tr><td><span class="mono">GEM_MAX_PAGES</span></td><td>5</td><td>Server-side page ceiling</td></tr>
+              <tr><td><span class="mono">PDF_MAX_BYTES</span></td><td>8,000,000</td><td>Refuse larger tender documents</td></tr>
+              <tr><td><span class="mono">PDF_MAX_CHARS</span></td><td>18,000</td><td>Text passed to extraction and summarisation</td></tr>
+              <tr><td><span class="mono">BRAIN_HOST</span> / <span class="mono">BRAIN_PORT</span></td><td>127.0.0.1 / 8000</td><td>Backend bind address</td></tr>
+              <tr><td><span class="mono">BRAIN_API_URL</span></td><td>http://127.0.0.1:8000</td><td>Where the frontend finds the API</td></tr>
+              <tr><td><span class="mono">GEM_DATA_DIR</span></td><td>./data</td><td>Relocate settings and runs (<span class="mono">BRAIN_DATA_DIR</span> is the legacy alias)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">.env — example</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="c"># AI summaries (optional)</span>
+GROQ_API_KEY=
+GROQ_MODEL=llama-3.3-70b-versatile
+GROQ_MAX_TOKENS=800
+GROQ_REASONING_EFFORT=low
+
+<span class="c"># Google Sheets mirror (optional)</span>
+GOOGLE_SERVICE_ACCOUNT_JSON=C:\keys\gem-sheets.json
+GOOGLE_SHEET_ID=
+
+<span class="c"># Fetching</span>
+ALLOW_PLAYWRIGHT_FALLBACK=false
+GEM_SAMPLE_MODE=false
+GEM_SAMPLE_FALLBACK=true
+
+<span class="c"># Local paths</span>
+<span class="c"># GEM_DATA_DIR=C:\projects\gem_automation\data</span></code></pre>
+      </div>
+
+      <div class="callout">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+        <p><strong>Precedence.</strong> A profile saved in the UI wins over defaults. Environment variables control infrastructure and credentials, not the search strategy. The only overlap is the default sheet id, which the UI field can override.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 13 -->
+    <section class="section" id="sheets">
+      <div class="section-head">
+        <div class="kicker"><span class="num">13</span> Google Sheets</div>
+        <h2>A readable mirror, not a second source of truth <a class="anchor-link" href="#sheets" aria-label="Link to Google Sheets">#</a></h2>
+        <p>Sheets is where stakeholders review. The app remains authoritative for filters and results.</p>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <h3>One-time setup</h3>
+          <ol class="list tight" style="list-style:decimal;padding-left:20px">
+            <li>Enable the <strong>Sheets</strong> API in a Google Cloud project.</li>
+            <li>Create a service account and download its JSON key.</li>
+            <li>Share the spreadsheet with the service account as <strong>Editor</strong>.</li>
+            <li>Wire up <code class="inline">GOOGLE_SERVICE_ACCOUNT_JSON</code> and <code class="inline">GOOGLE_SHEET_ID</code>.</li>
+            <li>Switch on <strong>Export to Google Sheets</strong>.</li>
+          </ol>
+          <p class="small" style="margin-top:12px"><a href="#service-account">Jump to the step-by-step walkthrough ↓</a></p>
+        </div>
+        <div class="card">
+          <h3>What gets written</h3>
+          <div class="table-wrap" style="margin:10px 0 0;border:0">
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Tab</th><th>Contents</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Settings</strong></td><td>Human-readable snapshot of the active profile</td></tr>
+                  <tr><td><strong>Tenders</strong></td><td>Ranked shortlist with score, buyer, dates, value, EMD, summary and eligibility flags</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="small muted" style="margin-top:10px">The results tab name is configurable via <code class="inline">sheet_tab</code> (default “Tenders”).</p>
+        </div>
+      </div>
+
+      <h3 id="service-account" style="margin-top:28px">Service account and Sheets API, step by step</h3>
+      <p>Two separate permissions must line up: the <strong>API must be enabled</strong> in a Google Cloud project, and the <strong>spreadsheet must be shared</strong> with the service account. A service account is a robot identity with its own email address, so enabling the API alone changes nothing — and neither does sharing alone.</p>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <span class="tag brand">Step 1</span>
+          <h3 style="margin-top:10px">Create a Cloud project</h3>
+          <p class="small">Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">console.cloud.google.com</a> and create a project, for example <span class="mono">gem-tenders</span>. Its project id becomes part of the service-account email.</p>
+        </div>
+        <div class="card">
+          <span class="tag teal">Step 2</span>
+          <h3 style="margin-top:10px">Enable the Sheets API</h3>
+          <p class="small">Go to <strong>APIs &amp; Services → Library</strong>, search for <strong>Google Sheets API</strong> and press <strong>Enable</strong>. Allow about a minute for it to propagate. Enable <strong>Google Drive API</strong> too only if you want scripts to create spreadsheets; writing to an existing shared sheet needs the Sheets API alone.</p>
+        </div>
+        <div class="card">
+          <span class="tag blue">Step 3</span>
+          <h3 style="margin-top:10px">Create the service account</h3>
+          <p class="small"><strong>APIs &amp; Services → Credentials → Create credentials → Service account.</strong> Name it <span class="mono">gem-sheets</span> and save. No IAM role is required — access comes from the spreadsheet share, not from the project.</p>
+        </div>
+        <div class="card">
+          <span class="tag amber">Step 4</span>
+          <h3 style="margin-top:10px">Download the JSON key</h3>
+          <p class="small">Open the service account and choose <strong>Keys → Add key → Create new key → JSON</strong>. The file downloads once. Store it as <span class="mono">secrets/service-account.json</span> and point <span class="mono">GOOGLE_SERVICE_ACCOUNT_JSON</span> at it; the <span class="mono">secrets/</span> pattern is git-ignored.</p>
+        </div>
+        <div class="card">
+          <span class="tag green">Step 5</span>
+          <h3 style="margin-top:10px">Share the spreadsheet</h3>
+          <p class="small">Open the target sheet, press <strong>Share</strong>, and add the address from <span class="mono">client_email</span> in the key file — it looks like <span class="mono">gem-sheets@project-id.iam.gserviceaccount.com</span>. Choose <strong>Editor</strong> and confirm. Viewer is not enough, because every export clears and rewrites the tabs.</p>
+        </div>
+        <div class="card">
+          <span class="tag">Step 6</span>
+          <h3 style="margin-top:10px">Connect the app</h3>
+          <p class="small">Copy the id between <span class="mono">/d/</span> and <span class="mono">/edit</span> in the sheet URL into <span class="mono">GOOGLE_SHEET_ID</span> or <strong>Settings → Google Sheet ID</strong>, then switch on <strong>Export to Google Sheets</strong>. The settings value wins; the environment variable is the fallback.</p>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">verify — can the robot open the sheet?</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="c"># Run from the project root. A title means API, key and sharing are all correct.</span>
+.\.venv\Scripts\python.exe -c "from backend import config; from backend.sheets import _load_client; print('connected to:', _load_client().open_by_key(config.GOOGLE_SHEET_ID).title)"</code></pre>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">verify — export the latest saved run</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="c"># Writes the Settings and Tenders tabs, then prints a status object.</span>
+.\.venv\Scripts\python.exe -m backend.cli export</code></pre>
+      </div>
+
+      <p class="small muted">A healthy export returns <span class="mono">{"status": "ok", "rows_written": 25, ...}</span>. Anything else is explained below.</p>
+
+      <h3 style="margin-top:24px">Diagnosing a failed export</h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Message</th><th>Meaning</th><th>Fix</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono">403 SERVICE_DISABLED … sheets.googleapis.com</span></td><td>Sheets API is off in the project behind the key</td><td>Enable it (Step 2), then retry after a minute</td></tr>
+              <tr><td><span class="mono">403 SERVICE_DISABLED … drive.googleapis.com</span></td><td>Drive API is off</td><td>Only needed to create files; enable it if you need that</td></tr>
+              <tr><td><span class="mono">403 The caller does not have permission</span></td><td>The sheet is not shared with the service account</td><td>Share it as Editor with <span class="mono">client_email</span> (Step 5)</td></tr>
+              <tr><td><span class="mono">404 Requested entity was not found</span></td><td>Wrong or deleted sheet id</td><td>Re-copy the id from the sheet URL</td></tr>
+              <tr><td><span class="mono">invalid_grant</span></td><td>Key revoked or rotated, or the clock is wrong</td><td>Generate a fresh key and check system time</td></tr>
+              <tr><td><span class="mono">Quota exceeded … per minute</span></td><td>Too many write requests</td><td>Export once per run, not once per tender</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout ok">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+        <p><strong>Common mix-up:</strong> sharing the sheet with your own Gmail address does nothing. The invite must go to the service-account address shown as <span class="mono">client_email</span> in the JSON key — a robot identity that can never sign in to the sheet.</p>
+      </div>
+
+      <div class="callout warn">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4l9 16H3L12 4z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+        <p><strong>Editing the sheet does not change the scan.</strong> The Settings tab is a mirror written on export. To change filters, use the app's Settings tab; the next run will overwrite the sheet snapshot.</p>
+      </div>
+
+      <h3 style="margin-top:24px">Export behaviour</h3>
+      <ul class="list">
+        <li><b>Idempotent.</b> Each export rewrites the same tabs; rows are not appended, so a rerun never duplicates the shortlist.</li>
+        <li><b>Non-fatal.</b> A failed export is recorded in <code class="inline">RunRecord.errors</code> and the run still completes with local results.</li>
+        <li><b>Re-exportable.</b> <code class="inline">POST /api/export</code> or <code class="inline">python -m backend.cli export</code> rebuilds the sheet from a saved run without scanning again.</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ 14 -->
+    <section class="section" id="interface">
+      <div class="section-head">
+        <div class="kicker"><span class="num">14</span> Interface</div>
+        <h2>Four tabs, one flow <a class="anchor-link" href="#interface" aria-label="Link to interface">#</a></h2>
+        <p>The Streamlit UI is deliberately narrow: configure, run, review, repeat.</p>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <span class="tag brand">Dashboard</span>
+          <h3 style="margin-top:10px">The shortlist</h3>
+          <ul class="list tight small">
+            <li>Run scan and refresh controls with live progress</li>
+            <li>Five metrics: matched, fetched, average score, IT count, closing within 10 days</li>
+            <li>Search plus group and state filters</li>
+            <li>Minimum-score slider, defaulting to the profile floor</li>
+            <li>Expandable tender cards with summary, eligibility, score breakdown and links</li>
+            <li>CSV download of the visible shortlist</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag teal">Settings</span>
+          <h3 style="margin-top:10px">The search profile</h3>
+          <ul class="list tight small">
+            <li>Categories and keywords as editable lists</li>
+            <li>Region, preferred states and bid type</li>
+            <li>Value caps, EMD cap, runway and score floor</li>
+            <li>Excluded keywords</li>
+            <li>PDF and AI enrichment depth</li>
+            <li>Google Sheet id and export toggle</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag blue">Run history</span>
+          <h3 style="margin-top:10px">The audit trail</h3>
+          <ul class="list tight small">
+            <li>Recent runs with source, counts, duration and status</li>
+            <li>Load a previous run without rescanning</li>
+            <li>Re-export a stored run to Sheets</li>
+            <li>Rejection counts for profile tuning</li>
+          </ul>
+        </div>
+        <div class="card">
+          <span class="tag">How it works</span>
+          <h3 style="margin-top:10px">The explainer</h3>
+          <ul class="list tight small">
+            <li>Plain-language pipeline overview</li>
+            <li>What each score component means</li>
+            <li>Credential and limitation notes</li>
+            <li>Where data is stored on disk</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3 style="margin-top:26px">A typical session</h3>
+      <div class="timeline">
+        <div class="tl-item done">
+          <div class="tl-when">min 0</div>
+          <div class="tl-body"><h4>Open the dashboard</h4><p>The latest saved run loads automatically. If none exists, sample mode is the fastest way to see the shape of the output.</p></div>
+        </div>
+        <div class="tl-item done">
+          <div class="tl-when">min 1</div>
+          <div class="tl-body"><h4>Adjust the profile</h4><p>Set preferred states and caps for the week. Save. The next scan uses the new profile.</p></div>
+        </div>
+        <div class="tl-item done">
+          <div class="tl-when">min 2</div>
+          <div class="tl-body"><h4>Run the scan</h4><p>Progress moves through fetch, score, PDF, summarize and save. The UI stays responsive because the run is threaded.</p></div>
+        </div>
+        <div class="tl-item done">
+          <div class="tl-when">min 4</div>
+          <div class="tl-body"><h4>Triage the top 10</h4><p>Read summaries, check flags, open the tender link. Export to Sheets for the bid team.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ 15 -->
+    <section class="section" id="automation">
+      <div class="section-head">
+        <div class="kicker"><span class="num">15</span> Automation</div>
+        <h2>CLI and scheduled scans <a class="anchor-link" href="#automation" aria-label="Link to automation">#</a></h2>
+        <p>The same pipeline runs without a browser, which makes it suitable for cron, Task Scheduler and GitHub Actions.</p>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">Command line</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="c"># Offline demo with a CSV export</span>
+<span class="k">python</span> -m backend.cli run --sample --csv artifacts/tenders.csv
+
+<span class="c"># Fastest live run: no PDF parsing, rule-based summaries</span>
+<span class="k">python</span> -m backend.cli run --no-pdf --no-ai
+
+<span class="c"># Live run plus Google Sheets mirror</span>
+<span class="k">python</span> -m backend.cli run --sheet
+
+<span class="c"># Re-export a stored run</span>
+<span class="k">python</span> -m backend.cli export --run-id 20261125T215847-5ccb24
+
+<span class="c"># One-shot entry point for schedulers</span>
+<span class="k">python</span> run_once.py</code></pre>
+      </div>
+
+      <div class="grid grid-2">
+        <div>
+          <h4>Run flags</h4>
+          <div class="table-wrap" style="margin-top:8px">
+            <div class="table-scroll">
+              <table>
+                <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+                <tbody>
+                  <tr><td><span class="mono">--sample</span></td><td>Use the offline dataset</td></tr>
+                  <tr><td><span class="mono">--no-pdf</span></td><td>Skip tender document parsing</td></tr>
+                  <tr><td><span class="mono">--no-ai</span></td><td>Force rule-based summaries</td></tr>
+                  <tr><td><span class="mono">--sheet</span></td><td>Enable Google Sheets export</td></tr>
+                  <tr><td><span class="mono">--pages N</span></td><td>Override page count (1–50)</td></tr>
+                  <tr><td><span class="mono">--csv PATH</span></td><td>Write the shortlist as CSV</td></tr>
+                  <tr><td><span class="mono">--json</span></td><td>Print the full run record</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h4>GitHub Actions</h4>
+          <ol class="list tight" style="list-style:decimal;padding-left:20px">
+            <li>Copy <code class="inline">deploy/github-actions-gem-tenders.yml</code> to <code class="inline">.github/workflows/gem-tenders.yml</code>.</li>
+            <li>Add repository secrets: <code class="inline">GROQ_API_KEY</code>, <code class="inline">GOOGLE_SERVICE_ACCOUNT_JSON</code>, <code class="inline">GOOGLE_SHEET_ID</code>.</li>
+            <li>Run it manually from the Actions tab, or uncomment the <code class="inline">schedule</code> block.</li>
+            <li>Download the generated CSV from the workflow artifacts.</li>
+          </ol>
+          <div class="callout" style="margin-top:12px">
+            <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+            <p>GitHub-hosted runners have different network egress than your machine. A live GeM run that fails locally may still succeed in CI — or the reverse. Always keep sample mode available for smoke tests.</p>
+          </div>
+        </div>
+      </div>
+
+      <h4 style="margin-top:20px">Scheduling locally</h4>
+      <p class="small">On Windows, create a Task Scheduler job that runs <code class="inline">run_once.py</code> with the project's virtual environment. On Linux/macOS, a cron entry such as <code class="inline">0 8 * * 1-5</code> gives a weekday-morning shortlist before the team starts.</p>
+    </section>
+
+    <!-- ============================================================ 16 -->
+    <section class="section" id="quality">
+      <div class="section-head">
+        <div class="kicker"><span class="num">16</span> Quality</div>
+        <h2>How the build is verified <a class="anchor-link" href="#quality" aria-label="Link to quality">#</a></h2>
+        <p>Automated tests cover the deterministic core. The UI, Groq summaries and the Sheets export were also verified against the live services.</p>
+      </div>
+
+      <div class="grid grid-4" style="margin-bottom:18px">
+        <div class="stat"><b>22</b><span>Tests passing</span><span class="sub">pytest</span></div>
+        <div class="stat"><b>0</b><span>Lint findings</span><span class="sub">ruff</span></div>
+        <div class="stat"><b>34 → 25</b><span>Sample run</span><span class="sub">fetched → matched</span></div>
+        <div class="stat"><b>0</b><span>Console errors</span><span class="sub">browser check</span></div>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Area</th><th>Covered by</th><th>What it proves</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Currency &amp; dates</strong></td><td><span class="mono">test_utils.py</span></td><td>Indian amount formats, lakh/crore parsing, date normalisation and runway</td></tr>
+              <tr><td><strong>Filtering &amp; scoring</strong></td><td><span class="mono">test_scoring.py</span></td><td>Exclusions, caps, classification, score components and threshold</td></tr>
+              <tr><td><strong>Normalisation &amp; PDF</strong></td><td><span class="mono">test_normalization.py</span></td><td>GeM row mapping, empty rows, eligibility extraction, flag generation, summary content</td></tr>
+              <tr><td><strong>API contract</strong></td><td><span class="mono">test_api.py</span></td><td>Health, meta, settings round-trip, run lifecycle and error responses</td></tr>
+              <tr><td><strong>End-to-end pipeline</strong></td><td><span class="mono">test_pipeline.py</span></td><td>A full sample run persists a valid record and returns a sorted shortlist</td></tr>
+              <tr><td><strong>AI summaries</strong></td><td><span class="mono">test_summarizer.py</span></td><td>Groq payload shape, reasoning-model token budget, and empty-response fallback to rules</td></tr>
+              <tr><td><strong>Sheets export</strong></td><td><span class="mono">test_sheets.py</span></td><td>Settings and Tenders tabs, header row, overwrite behaviour and skip reasons</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="code">
+        <div class="code-head"><span class="dots"><i></i><i></i><i></i></span><span class="path">Verification commands</span><button class="copy-btn" type="button">Copy</button></div>
+        <pre><code><span class="k">pip</span> install -r requirements-dev.txt
+
+<span class="k">python</span> -m pytest -q
+<span class="k">ruff</span> check backend frontend tests
+
+<span class="c"># Frontend smoke test without a browser</span>
+<span class="k">python</span> -m streamlit run frontend/app.py --server.headless true</code></pre>
+      </div>
+
+      <div class="callout">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></span>
+        <p><strong>Known non-blocking warning:</strong> Starlette's test client emits a deprecation notice about <code class="inline">httpx</code>/<code class="inline">httpx2</code>. It does not affect the app, the tests or the API. Track it when upgrading the test stack.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 17 -->
+    <section class="section" id="risks">
+      <div class="section-head">
+        <div class="kicker"><span class="num">17</span> Risks</div>
+        <h2>Limits, and how they are handled <a class="anchor-link" href="#risks" aria-label="Link to risks">#</a></h2>
+        <p>This product depends on a website with no public contract. Design for failure, not for stability.</p>
+      </div>
+
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Risk</th><th>Impact</th><th>Mitigation</th><th style="width:74px">Severity</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>GeM blocks automated requests</strong></td>
+                <td>No live results. Observed as HTTP 403 from some networks.</td>
+                <td>Optional Playwright session, browser-like headers, sample fallback with a clear source label.</td>
+                <td><span class="tag red">High</span></td>
+              </tr>
+              <tr>
+                <td><strong>Undocumented endpoint changes</strong></td>
+                <td>Fields disappear or pagination breaks after a GeM release.</td>
+                <td>Normalisation is isolated in <code class="inline">gem_client.py</code>; missing fields degrade to blanks rather than crashing.</td>
+                <td><span class="tag amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td><strong>Eligibility extraction is heuristic</strong></td>
+                <td>A missed clause could make a tender look safer than it is.</td>
+                <td>Flags are presented as “check this”, never as approval; the source link is always shown.</td>
+                <td><span class="tag amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td><strong>AI summary drift</strong></td>
+                <td>A model could imply eligibility that the document does not support.</td>
+                <td>Strict prompt, short factual output, rule-based fallback, and no eligibility claims in summaries.</td>
+                <td><span class="tag amber">Medium</span></td>
+              </tr>
+              <tr>
+                <td><strong>Rate limits and terms of use</strong></td>
+                <td>Aggressive scanning could get the network blocked.</td>
+                <td>Page cap, request timeout, no parallel fetch, and a recommendation to scan at most a few times per day.</td>
+                <td><span class="tag blue">Low</span></td>
+              </tr>
+              <tr>
+                <td><strong>Credential exposure</strong></td>
+                <td>A leaked service account or API key could be abused.</td>
+                <td><code class="inline">.env</code> is git-ignored, the UI never stores keys, and CI uses repository secrets.</td>
+                <td><span class="tag red">High</span></td>
+              </tr>
+              <tr>
+                <td><strong>Single-user, local-only design</strong></td>
+                <td>No authentication, roles or audit log. Not safe on a public host.</td>
+                <td>Bind to localhost by default; document the constraint; add auth before any remote deployment.</td>
+                <td><span class="tag blue">Low</span></td>
+              </tr>
+              <tr>
+                <td><strong>JSON storage growth</strong></td>
+                <td>Hundreds of full run records accumulate on disk.</td>
+                <td>Runs are small and human-readable; old records can be deleted at any time. A retention policy is on the roadmap.</td>
+                <td><span class="tag blue">Low</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="callout danger">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 4l9 16H3L12 4z"/><path d="M12 10v4M12 17h.01"/></svg></span>
+        <p><strong>Live fetch is not guaranteed.</strong> During the build, the GeM listing endpoint returned HTTP 403 from the development network. Sample mode is the supported fallback, and the run is labelled <code class="inline">sample</code> so it can never be mistaken for live data.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 18 -->
+    <section class="section" id="roadmap">
+      <div class="section-head">
+        <div class="kicker"><span class="num">18</span> Roadmap</div>
+        <h2>What comes next <a class="anchor-link" href="#roadmap" aria-label="Link to roadmap">#</a></h2>
+        <p>Ordered by how much manual work each item removes.</p>
+      </div>
+
+      <div class="timeline">
+        <div class="tl-item done">
+          <div class="tl-when">Shipped<br>v1.0</div>
+          <div class="tl-body">
+            <h4>Core scan loop</h4>
+            <p>Configurable profile, live and sample fetching, hard filters, explainable scoring, PDF eligibility, summaries, dashboard, CSV, Sheets and run history.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-when">Next<br>v1.1</div>
+          <div class="tl-body">
+            <h4>Less repetitive triage</h4>
+            <p>Saved search presets, cross-run deduplication (“seen this bid”), a weekday email digest, better PDF table parsing, and Playwright promoted to a documented default fallback.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-when">Later<br>v1.2</div>
+          <div class="tl-body">
+            <h4>Team workflow</h4>
+            <p>Bid status tracking (new → reviewing → bidding → submitted → lost/won), owner assignment, notes, and a shortlist comparison across weeks.</p>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-when">Future<br>v2.0</div>
+          <div class="tl-body">
+            <h4>Multi-user product</h4>
+            <p>Authentication, Postgres, per-user profiles, notification channels, and analytics on win rate by category, state and buyer.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout ok">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+        <p><strong>Deliberate constraint:</strong> no roadmap item adds bid submission. The product's value is choosing the right bids, not operating the portal.</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ 19 -->
+    <section class="section" id="faq">
+      <div class="section-head">
+        <div class="kicker"><span class="num">19</span> FAQ</div>
+        <h2>Questions that come up <a class="anchor-link" href="#faq" aria-label="Link to FAQ">#</a></h2>
+      </div>
+
+      <details class="faq" open>
+        <summary>Does it bid on tenders automatically?</summary>
+        <div class="faq-body"><p>No. It never logs in, signs, pays an EMD or submits a bid. It produces a ranked shortlist and an eligibility risk list; a human makes the decision and files the bid on GeM.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Is the sample data real?</summary>
+        <div class="faq-body"><p>No. It is a synthetic dataset shaped like real GeM rows, used to demonstrate and test the pipeline without network access. Every run declares <code class="inline">source: sample</code>, and sample and live bids are never mixed.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Why did a live scan fail with HTTP 403?</summary>
+        <div class="faq-body"><p>GeM does not publish an official API and may reject automated clients. The app falls back to sample data when <code class="inline">GEM_SAMPLE_FALLBACK=true</code>, or you can enable the optional Playwright fallback to make the request from inside a real browser session.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Sheets export says “The caller does not have permission”. Why?</summary>
+        <div class="faq-body"><p>The service account has no access to that spreadsheet. Share the file with the address in <code class="inline">client_email</code> from the JSON key, as <strong>Editor</strong>. Enabling the Sheets API is a separate requirement — both are needed. See <a href="#service-account">Service account and Sheets API</a>.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Do I need paid services to use it?</summary>
+        <div class="faq-body"><p>No. The app runs fully locally with rule-based summaries and CSV output. Groq has a free tier for AI summaries, and Google Sheets requires a free service account but no paid plan.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Where is my data stored?</summary>
+        <div class="faq-body"><p>Settings and run records are plain JSON in <code class="inline">data/</code> (<code class="inline">settings.json</code> and <code class="inline">runs/</code>). Nothing is sent anywhere except the optional GeM fetch, Groq call and Google Sheets export. Credentials live in <code class="inline">.env</code>, which is git-ignored.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Can I change the scoring weights?</summary>
+        <div class="faq-body"><p>Yes. Positive and negative weights live in <code class="inline">backend/scoring.py</code>, and risk terms live in <code class="inline">backend/constants.py</code>. The UI exposes the threshold (<code class="inline">min_score</code>) but not the individual weights, so changes are deliberate and reviewable.</p></div>
+      </details>
+      <details class="faq">
+        <summary>Does it work on macOS or Linux?</summary>
+        <div class="faq-body"><p>Yes. The Python code is cross-platform. Only the activation command and path separators differ; use <code class="inline">source .venv/bin/activate</code> and forward slashes.</p></div>
+      </details>
+      <details class="faq">
+        <summary>How many bids can it handle?</summary>
+        <div class="faq-body"><p>The page cap is 50 (five by default). Filtering is linear and cheap; the expensive parts are capped separately by <code class="inline">parse_pdf_top_n</code> and <code class="inline">summarize_top_n</code> (ten each by default). Increase them only after measuring a run.</p></div>
+      </details>
+    </section>
+
+    <!-- ============================================================ 20 -->
+    <section class="section" id="appendix">
+      <div class="section-head">
+        <div class="kicker"><span class="num">20</span> Appendix</div>
+        <h2>Reference <a class="anchor-link" href="#appendix" aria-label="Link to appendix">#</a></h2>
+        <p>File map, glossary and document control.</p>
+      </div>
+
+      <h3>Project file map</h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Path</th><th>Responsibility</th></tr></thead>
+            <tbody>
+              <tr><td><span class="mono">backend/main.py</span></td><td>FastAPI application and routes</td></tr>
+              <tr><td><span class="mono">backend/pipeline.py</span></td><td>Run orchestration, progress callbacks and the background run manager</td></tr>
+              <tr><td><span class="mono">backend/gem_client.py</span></td><td>GeM requests, Playwright fallback and row normalisation</td></tr>
+              <tr><td><span class="mono">backend/scoring.py</span></td><td>Classification, hard filters and explainable scoring</td></tr>
+              <tr><td><span class="mono">backend/pdf_parser.py</span></td><td>Document download, text extraction and eligibility signals</td></tr>
+              <tr><td><span class="mono">backend/summarizer.py</span></td><td>Groq summaries and deterministic rule-based fallback</td></tr>
+              <tr><td><span class="mono">backend/sheets.py</span></td><td>Google Sheets export and tab formatting</td></tr>
+              <tr><td><span class="mono">backend/storage.py</span></td><td>Atomic JSON persistence for settings and runs</td></tr>
+              <tr><td><span class="mono">backend/sample_data.py</span></td><td>Offline demonstration dataset</td></tr>
+              <tr><td><span class="mono">backend/models.py</span></td><td>Pydantic models and validation rules</td></tr>
+              <tr><td><span class="mono">backend/constants.py</span></td><td>Categories, keywords, states, risk terms</td></tr>
+              <tr><td><span class="mono">backend/utils.py</span></td><td>Rupee/date parsing, state matching and formatting</td></tr>
+              <tr><td><span class="mono">backend/cli.py</span></td><td>Command-line runner and exporter</td></tr>
+              <tr><td><span class="mono">frontend/app.py</span></td><td>Streamlit dashboard, settings, history and help</td></tr>
+              <tr><td><span class="mono">frontend/api_client.py</span></td><td>Typed HTTP client for the backend</td></tr>
+              <tr><td><span class="mono">tests/</span></td><td>Unit, API and end-to-end sample tests</td></tr>
+              <tr><td><span class="mono">deploy/</span></td><td>GitHub Actions workflow template</td></tr>
+              <tr><td><span class="mono">data/</span></td><td>Runtime settings and saved runs</td></tr>
+              <tr><td><span class="mono">brain/index.html</span></td><td>This document</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style="margin-top:24px">Glossary</h3>
+      <dl class="kv">
+        <dt>GeM</dt><dd>Government e-Marketplace, India's public procurement portal.</dd>
+        <dt>Bid number</dt><dd>The unique GeM identifier for a tender, used for deduplication and links.</dd>
+        <dt>EMD</dt><dd>Earnest Money Deposit — the refundable security a bidder must furnish.</dd>
+        <dt>MSE</dt><dd>Micro and Small Enterprise; often eligible for fee and turnover relaxations.</dd>
+        <dt>OEM</dt><dd>Original Equipment Manufacturer; authorisation is often demanded for hardware supply.</dd>
+        <dt>AMC</dt><dd>Annual Maintenance Contract.</dd>
+        <dt>Turnover</dt><dd>Annual revenue threshold a bidder must demonstrate.</dd>
+        <dt>Offer validity</dt><dd>How long a submitted price must remain open.</dd>
+        <dt>P0 / P1</dt><dd>Priority levels: P0 is required for a usable run, P1 improves trust and sharing.</dd>
+        <dt>Runaway / runway</dt><dd>Days remaining before the bid closes; the scan enforces a minimum.</dd>
+      </dl>
+
+      <h3 style="margin-top:24px">Document control</h3>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Item</th><th>Value</th></tr></thead>
+            <tbody>
+              <tr><td>Document</td><td>GeM Tender Brain — Product Requirements Document</td></tr>
+              <tr><td>Version</td><td>1.0.1</td></tr>
+              <tr><td>Status</td><td>MVP complete; live fetch subject to GeM availability</td></tr>
+              <tr><td>Owner</td><td>Bid &amp; Growth team</td></tr>
+              <tr><td>Audience</td><td>Operators, bid managers, developers maintaining the pipeline</td></tr>
+              <tr><td>Last updated</td><td>25 November 2026</td></tr>
+              <tr><td>Next review</td><td>On the next GeM integration change, or at v1.1</td></tr>
+              <tr><td>Source of truth</td><td>This file plus the repository README and code</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <h3 style="margin-top:24px">Changelog</h3>
+      <div class="timeline">
+        <div class="tl-item done">
+          <div class="tl-when">v1.0.1</div>
+          <div class="tl-body"><h4>Credential hardening and setup guide</h4><p>Groq summaries now reserve 800 completion tokens and send <span class="mono">reasoning_effort=low</span> for reasoning models, fixing empty summaries on <span class="mono">gpt-oss</span>. Added a step-by-step service-account and Sheets API walkthrough with a troubleshooting table. Added tests for summariser payloads and the Sheets export path; the suite is now 22 tests.</p></div>
+        </div>
+        <div class="tl-item done">
+          <div class="tl-when">v1.0.0</div>
+          <div class="tl-body"><h4>Initial release</h4><p>Full scan pipeline, explainable scoring, PDF eligibility, Groq and rule-based summaries, Streamlit workspace, CSV and Sheets export, CLI and workflow template, 17 tests.</p></div>
+        </div>
+      </div>
+
+      <hr class="divider">
+      <p class="small muted">Not affiliated with GeM. GeM does not publish an official API; live fetching may break without notice. Always verify eligibility in the original tender document before bidding.</p>
+    </section>
+
+  </main>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <strong>GeM Tender Brain</strong> · Product Requirements Document
+      <div class="small muted">Version 1.0.1 · Last updated 25 November 2026</div>
+    </div>
+    <div class="footer-links">
+      <a href="#overview">Overview</a>
+      <a href="#setup">Quick start</a>
+      <a href="#api">API</a>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </div>
+</footer>
+
+<button class="to-top" id="toTop" aria-label="Back to top">↑</button>
+
+<script>
+  (function () {
+    "use strict";
+
+    var root = document.documentElement;
+    var themeBtn = document.getElementById("themeBtn");
+
+    function setTheme(theme) {
+      root.setAttribute("data-theme", theme);
+      try { localStorage.setItem("gem-prd-theme", theme); } catch (e) {}
+      if (themeBtn) {
+        themeBtn.setAttribute("aria-label", theme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+      }
+    }
+
+    if (themeBtn) {
+      themeBtn.addEventListener("click", function () {
+        setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
+      });
+      themeBtn.setAttribute("aria-label",
+        root.getAttribute("data-theme") === "dark" ? "Switch to light mode" : "Switch to dark mode");
+    }
+
+    /* ---------------------------------------------------------- progress */
+    var progress = document.getElementById("readProgress");
+    var toTop = document.getElementById("toTop");
+
+    function onScroll() {
+      var doc = document.documentElement;
+      var max = doc.scrollHeight - window.innerHeight;
+      var pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+      if (progress) progress.style.width = Math.min(100, Math.max(0, pct)) + "%";
+      if (toTop) toTop.classList.toggle("show", window.scrollY > 600);
+      spy();
+    }
+
+    var ticking = false;
+    window.addEventListener("scroll", function () {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(function () { onScroll(); ticking = false; });
+      }
+    }, { passive: true });
+
+    /* ---------------------------------------------------------- scrollspy */
+    var links = Array.prototype.slice.call(document.querySelectorAll(".toc-link"));
+    var sections = links.map(function (link) {
+      return document.querySelector(link.getAttribute("href"));
+    }).filter(Boolean);
+    var activeId = "";
+
+    function spy() {
+      if (!sections.length) return;
+      var offset = window.scrollY + 120;
+      var current = sections[0].id;
+      for (var i = 0; i < sections.length; i++) {
+        if (sections[i].offsetTop <= offset) current = sections[i].id;
+      }
+      if (current === activeId) return;
+      activeId = current;
+      links.forEach(function (link) {
+        var on = link.getAttribute("href") === "#" + current;
+        link.classList.toggle("active", on);
+        if (on) link.setAttribute("aria-current", "true");
+        else link.removeAttribute("aria-current");
+      });
+    }
+
+    /* ---------------------------------------------------------- toc filter */
+    var search = document.getElementById("tocSearch");
+    var empty = document.getElementById("tocEmpty");
+    if (search) {
+      search.addEventListener("input", function () {
+        var q = search.value.trim().toLowerCase();
+        var any = false;
+        links.forEach(function (link) {
+          var match = !q || link.textContent.toLowerCase().indexOf(q) !== -1;
+          link.classList.toggle("hidden", !match);
+          if (match) any = true;
+        });
+        document.querySelectorAll(".toc-group").forEach(function (group) {
+          var visible = group.querySelectorAll(".toc-link:not(.hidden)").length;
+          group.style.display = visible ? "" : "none";
+        });
+        if (empty) empty.style.display = any ? "none" : "block";
+      });
+    }
+
+    /* ---------------------------------------------------------- copy buttons */
+    document.querySelectorAll(".copy-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var block = btn.closest(".code");
+        var code = block ? block.querySelector("code") : null;
+        if (!code) return;
+        var text = code.innerText;
+        var done = function () {
+          var old = btn.textContent;
+          btn.textContent = "Copied";
+          window.setTimeout(function () { btn.textContent = old; }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(done, function () {});
+        } else {
+          var area = document.createElement("textarea");
+          area.value = text;
+          area.style.position = "fixed";
+          area.style.opacity = "0";
+          document.body.appendChild(area);
+          area.select();
+          try { document.execCommand("copy"); done(); } catch (e) {}
+          document.body.removeChild(area);
+        }
+      });
+    });
+
+    /* ---------------------------------------------------------- mobile nav */
+    var sidebar = document.getElementById("sidebar");
+    var scrim = document.getElementById("scrim");
+    var menuBtn = document.getElementById("menuBtn");
+
+    function closeNav() {
+      if (!sidebar) return;
+      sidebar.classList.remove("open");
+      if (scrim) scrim.hidden = true;
+      if (menuBtn) menuBtn.setAttribute("aria-expanded", "false");
+    }
+    function openNav() {
+      if (!sidebar) return;
+      sidebar.classList.add("open");
+      if (scrim) scrim.hidden = false;
+      if (menuBtn) menuBtn.setAttribute("aria-expanded", "true");
+    }
+    if (menuBtn) {
+      menuBtn.addEventListener("click", function () {
+        if (sidebar && sidebar.classList.contains("open")) closeNav();
+        else openNav();
+      });
+    }
+    if (scrim) scrim.addEventListener("click", closeNav);
+    links.forEach(function (link) { link.addEventListener("click", closeNav); });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") closeNav();
+    });
+
+    if (toTop) {
+      toTop.addEventListener("click", function () {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+
+    onScroll();
+  })();
+</script>
+</body>
+</html>

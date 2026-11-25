@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Local configuration and secrets
+.env
+secrets/*
+service_account*.json
+.streamlit/secrets.toml
+
+# Runtime data (settings and run results stay local)
+data/settings.json
+data/runs/*.json
+
+# Generated exports
+artifacts/
+*.csv

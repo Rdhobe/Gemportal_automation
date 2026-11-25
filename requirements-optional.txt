@@ -1,0 +1,4 @@
+# Optional: headless browser fallback when GeM blocks plain requests.
+# Install the package with:  pip install -r requirements-optional.txt
+# Then install the browser once with:  playwright install chromium
+playwright>=1.47,<2
